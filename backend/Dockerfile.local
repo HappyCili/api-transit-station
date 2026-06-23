@@ -1,0 +1,11 @@
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY sub2api /app/sub2api
+
+EXPOSE 8080
+
+CMD ["/app/sub2api"]

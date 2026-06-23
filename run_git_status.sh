@@ -1,0 +1,1 @@
+cd /home/darkfire/Documents/Projects/api-transit-station && echo "=== git status ===" && git status && echo "" && echo "=== git log (last 5) ===" && git log --oneline -5 && echo "" && echo "=== current branch ===" && git branch -a

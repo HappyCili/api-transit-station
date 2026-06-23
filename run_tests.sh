@@ -1,0 +1,1 @@
+cd /home/darkfire/Documents/Projects/api-transit-station/backend && go test -tags=unit -run "TestNowPayments" ./internal/payment/provider/ -v 2>&1 | head -80
