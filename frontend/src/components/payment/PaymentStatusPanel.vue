@@ -22,11 +22,11 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? '$' + paidOrder.amount.toFixed(2) : formatGatewayAmount(paidOrder.amount) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountSymbol }}{{ paidOrder.amount.toFixed(2) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ formatGatewayAmount(paidOrder.pay_amount) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatGatewayAmount(paidOrder.pay_amount, paidOrder.currency) }}</span>
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@
             <!-- Brand logo overlay -->
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
               <span :class="['rounded-full p-2 shadow ring-2 ring-white', qrLogoBgClass]">
-                <img :src="isAlipay ? alipayIcon : wxpayIcon" alt="" class="h-5 w-5 brightness-0 invert" />
+                <img :src="qrLogoIcon" alt="" class="h-5 w-5 brightness-0 invert" />
               </span>
             </div>
           </div>
@@ -158,14 +158,15 @@ import { usePaymentStore } from '@/stores/payment'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
-import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
-import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import { getPaymentPopupFeatures, isBuiltInAlipayMethod, isBuiltInWxpayMethod } from '@/components/payment/providerConfig'
+import { currencySymbol, formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
 import { useClipboard } from '@/composables/useClipboard'
 import type { PaymentOrder } from '@/types/payment'
 import Icon from '@/components/icons/Icon.vue'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
+import paymentIcon from '@/assets/icons/payment.svg'
 
 const props = defineProps<{
   orderId: number
@@ -188,7 +189,7 @@ const i18n = useI18n()
 const { t } = i18n
 const paymentStore = usePaymentStore()
 const appStore = useAppStore()
-const { copyToClipboard } = useClipboard()
+const { copyToClipboard } = useClipboard(appStore)
 
 const qrCanvas = ref<HTMLCanvasElement | null>(null)
 const qrUrl = ref('')
@@ -198,6 +199,7 @@ const checkingStatus = ref(false)
 const statusCheckError = ref('')
 const paidOrder = ref<PaymentOrder | null>(null)
 const paymentCurrency = computed(() => normalizePaymentCurrency(props.currency))
+const creditedAmountSymbol = currencySymbol('USD')
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -218,8 +220,8 @@ let lastVerifyAt = 0
 const VERIFY_RETRY_INTERVAL_MS = 15000
 const VERIFY_RETRY_MAX_ATTEMPTS = 6
 
-const isAlipay = computed(() => props.paymentType.includes('alipay'))
-const isWxpay = computed(() => props.paymentType.includes('wxpay'))
+const isAlipay = computed(() => isBuiltInAlipayMethod(props.paymentType))
+const isWxpay = computed(() => isBuiltInWxpayMethod(props.paymentType))
 const isNowPayments = computed(() => props.paymentType.includes('nowpayments'))
 
 const qrBorderClass = computed(() => {
@@ -232,6 +234,12 @@ const qrLogoBgClass = computed(() => {
   if (isAlipay.value) return 'bg-[#00AEEF]'
   if (isWxpay.value) return 'bg-[#2BB741]'
   return 'bg-gray-400'
+})
+
+const qrLogoIcon = computed(() => {
+  if (isAlipay.value) return alipayIcon
+  if (isWxpay.value) return wxpayIcon
+  return paymentIcon
 })
 
 const scanTitle = computed(() => {
@@ -264,8 +272,8 @@ const payAmountDisplay = computed(() => {
   return ''
 })
 
-function formatGatewayAmount(value: number): string {
-  return formatPaymentAmount(value, paymentCurrency.value, localeCode.value)
+function formatGatewayAmount(value: number, currency?: string | null): string {
+  return formatPaymentAmount(value, currency || paymentCurrency.value, localeCode.value)
 }
 
 function isSuccessStatus(status: string | null | undefined): boolean {
@@ -317,22 +325,33 @@ async function tryRecoverPendingOrder(order: PaymentOrder): Promise<PaymentOrder
   }
 }
 
+let pollInFlight = false
 async function pollStatus() {
   if (!props.orderId || outcome.value) return
-  let order = await paymentStore.pollOrderStatus(props.orderId)
-  if (!order) return
-  order = await tryRecoverPendingOrder(order)
-  if (isSuccessStatus(order.status)) {
-    cleanup()
-    paidOrder.value = order
-    setOutcome('success')
-    emit('success')
-  } else if (order.status === 'CANCELLED') {
-    cleanup()
-    setOutcome('cancelled')
-  } else if (order.status === 'EXPIRED' || order.status === 'FAILED') {
-    cleanup()
-    setOutcome('expired')
+  // 防重入：接口（含 verifyOrder 二次确认）响应慢于 3 秒轮询间隔时避免并发重叠请求。
+  if (pollInFlight) return
+  pollInFlight = true
+  try {
+    let order = await paymentStore.pollOrderStatus(props.orderId)
+    if (!order) return
+    // 已进入终态则不再处理迟到的响应。
+    if (outcome.value) return
+    order = await tryRecoverPendingOrder(order)
+    if (outcome.value) return
+    if (isSuccessStatus(order.status)) {
+      cleanup()
+      paidOrder.value = order
+      setOutcome('success')
+      emit('success')
+    } else if (order.status === 'CANCELLED') {
+      cleanup()
+      setOutcome('cancelled')
+    } else if (order.status === 'EXPIRED' || order.status === 'FAILED') {
+      cleanup()
+      setOutcome('expired')
+    }
+  } finally {
+    pollInFlight = false
   }
 }
 
@@ -346,45 +365,45 @@ function startCountdown(seconds: number) {
 }
 
 async function handleManualCheck() {
-	if (!props.orderId || checkingStatus.value || outcome.value) return
-	checkingStatus.value = true
-	statusCheckError.value = ''
-	try {
-		const res = await paymentAPI.checkOrderStatus(props.orderId)
-		const order = res.data
-		if (isSuccessStatus(order.status)) {
-			cleanup()
-			paidOrder.value = order
-			setOutcome('success')
-			emit('success')
-		} else if (order.status === 'CANCELLED') {
-			cleanup()
-			setOutcome('cancelled')
-		} else if (order.status === 'EXPIRED' || order.status === 'FAILED') {
-			cleanup()
-			setOutcome('expired')
-		}
-	} catch (err: unknown) {
-		const msg = extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))
-		statusCheckError.value = msg
-		setTimeout(() => { statusCheckError.value = '' }, 5000)
-	} finally {
-		checkingStatus.value = false
-	}
+  if (!props.orderId || checkingStatus.value || outcome.value) return
+  checkingStatus.value = true
+  statusCheckError.value = ''
+  try {
+    const res = await paymentAPI.checkOrderStatus(props.orderId)
+    const order = res.data
+    if (isSuccessStatus(order.status)) {
+      cleanup()
+      paidOrder.value = order
+      setOutcome('success')
+      emit('success')
+    } else if (order.status === 'CANCELLED') {
+      cleanup()
+      setOutcome('cancelled')
+    } else if (order.status === 'EXPIRED' || order.status === 'FAILED') {
+      cleanup()
+      setOutcome('expired')
+    }
+  } catch (err: unknown) {
+    const msg = extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))
+    statusCheckError.value = msg
+    setTimeout(() => { statusCheckError.value = '' }, 5000)
+  } finally {
+    checkingStatus.value = false
+  }
 }
 
 async function handleCancel() {
-	if (!props.orderId || cancelling.value) return
-	cancelling.value = true
-	try {
-		await paymentAPI.cancelOrder(props.orderId)
-		cleanup()
-		setOutcome('cancelled')
-	} catch (err: unknown) {
-		appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
-	} finally {
-		cancelling.value = false
-	}
+  if (!props.orderId || cancelling.value) return
+  cancelling.value = true
+  try {
+    await paymentAPI.cancelOrder(props.orderId)
+    cleanup()
+    setOutcome('cancelled')
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    cancelling.value = false
+  }
 }
 
 function handleDone() { cleanup(); emit('done') }

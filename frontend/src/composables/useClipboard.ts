@@ -18,9 +18,12 @@ function isClipboardSupported(): boolean {
 function fallbackCopy(text: string): boolean {
   const textarea = document.createElement('textarea')
   textarea.value = text
-  textarea.style.cssText = 'position:fixed;left:-9999px;top:-9999px'
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none'
   document.body.appendChild(textarea)
+  textarea.focus({ preventScroll: true })
   textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
   try {
     return document.execCommand('copy')
   } finally {
@@ -28,8 +31,7 @@ function fallbackCopy(text: string): boolean {
   }
 }
 
-export function useClipboard() {
-  const appStore = useAppStore()
+export function useClipboard(appStore = useAppStore()) {
   const copied = ref(false)
 
   const copyToClipboard = async (

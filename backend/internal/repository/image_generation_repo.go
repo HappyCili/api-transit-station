@@ -223,7 +223,7 @@ func buildImageGenerationWhere(userID int64, filters service.ImageGenerationList
 	return "WHERE " + strings.Join(clauses, " AND "), args
 }
 
-type rowScanner interface {
+type imageGenerationRowScanner interface {
 	Scan(dest ...any) error
 }
 
@@ -231,7 +231,7 @@ type rowsScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanImageGeneration(row rowScanner) (*service.ImageGeneration, error) {
+func scanImageGeneration(row imageGenerationRowScanner) (*service.ImageGeneration, error) {
 	return scanImageGenerationAny(row)
 }
 
