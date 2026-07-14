@@ -24,6 +24,7 @@ type fakeAPIKeyRepo struct {
 }
 
 type fakeGoogleSubscriptionRepo struct {
+	getByID        func(ctx context.Context, id int64) (*service.UserSubscription, error)
 	getActive      func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error)
 	updateStatus   func(ctx context.Context, subscriptionID int64, status string) error
 	activateWindow func(ctx context.Context, id int64, start time.Time) error
@@ -115,6 +116,9 @@ func (f fakeGoogleSubscriptionRepo) Create(ctx context.Context, sub *service.Use
 	return errors.New("not implemented")
 }
 func (f fakeGoogleSubscriptionRepo) GetByID(ctx context.Context, id int64) (*service.UserSubscription, error) {
+	if f.getByID != nil {
+		return f.getByID(ctx, id)
+	}
 	return nil, errors.New("not implemented")
 }
 func (f fakeGoogleSubscriptionRepo) GetByIDIncludeDeleted(ctx context.Context, id int64) (*service.UserSubscription, error) {
@@ -172,6 +176,9 @@ func (f fakeGoogleSubscriptionRepo) ActivateWindows(ctx context.Context, id int6
 	if f.activateWindow != nil {
 		return f.activateWindow(ctx, id, start)
 	}
+	return errors.New("not implemented")
+}
+func (f fakeGoogleSubscriptionRepo) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
 	return errors.New("not implemented")
 }
 func (f fakeGoogleSubscriptionRepo) ResetDailyUsage(ctx context.Context, id int64, start time.Time) error {

@@ -34,6 +34,14 @@ func TestOpenAIGatewayServiceForward_RejectsDisabledImageGenerationIntents(t *te
 			name: "image tool choice",
 			body: []byte(`{"model":"gpt-5.4","input":"draw","tool_choice":{"type":"image_generation"}}`),
 		},
+		{
+			name: "namespace image tool choice by name",
+			body: []byte(`{"model":"gpt-5.4","input":"draw","tool_choice":{"type":"namespace","name":"image_gen"}}`),
+		},
+		{
+			name: "namespace image tool choice by namespace",
+			body: []byte(`{"model":"gpt-5.4","input":"draw","tool_choice":{"type":"namespace","namespace":"image_gen"}}`),
+		},
 	}
 
 	for _, tt := range tests {

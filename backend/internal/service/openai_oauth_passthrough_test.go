@@ -705,7 +705,8 @@ func TestOpenAIGatewayService_OAuthLegacy_CompositeCodexUAUsesCodexOriginator(t 
 	_, err := svc.Forward(context.Background(), c, account, inputBody)
 	require.NoError(t, err)
 	require.NotNil(t, upstream.lastReq)
-	require.Equal(t, "codex_cli_rs", upstream.lastReq.Header.Get("originator"))
+	require.Equal(t, DefaultOpenAICodexUserAgent, upstream.lastReq.Header.Get("User-Agent"))
+	require.Equal(t, "codex-tui", upstream.lastReq.Header.Get("originator"))
 	require.NotEqual(t, "opencode", upstream.lastReq.Header.Get("originator"))
 }
 

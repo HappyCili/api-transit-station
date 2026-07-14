@@ -42,6 +42,13 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			want:     true,
 		},
 		{
+			name:     "namespace image_gen tool choice",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tool_choice":{"type":"namespace","name":"image_gen"}}`),
+			want:     true,
+		},
+		{
 			name:     "required tool choice alone is text",
 			endpoint: "/v1/responses",
 			model:    "gpt-5.4",
@@ -114,6 +121,17 @@ func TestIsImageGenerationIntentMap_NamespaceImageGen(t *testing.T) {
 							map[string]any{"type": "namespace", "name": "image_gen"},
 						},
 					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "namespace image_gen tool choice",
+			reqBody: map[string]any{
+				"model": "gpt-5.5",
+				"tool_choice": map[string]any{
+					"type":      "namespace",
+					"namespace": "image_gen",
 				},
 			},
 			want: true,
