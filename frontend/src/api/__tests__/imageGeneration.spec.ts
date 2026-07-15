@@ -1,11 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const deleteRequest = vi.hoisted(() => vi.fn())
+
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    delete: deleteRequest,
+  },
+}))
+
 import {
+  imageGenerationAPI,
   resolveImageGenerationRequestSize,
   type ImageAspectRatio,
   type ImageQuality,
 } from '@/api/imageGeneration'
 
 describe('resolveImageGenerationRequestSize', () => {
+  beforeEach(() => {
+    deleteRequest.mockReset()
+  })
   const cases: Array<[ImageQuality, ImageAspectRatio, string]> = [
     ['low', '1:1', '1024x1024'],
     ['low', '16:9', '1024x576'],
@@ -43,5 +56,15 @@ describe('resolveImageGenerationRequestSize', () => {
       expect(width).toBeLessThanOrEqual(4096)
       expect(height).toBeLessThanOrEqual(4096)
     }
+  })
+
+  it('deletes history by conversation ID', async () => {
+    deleteRequest.mockResolvedValue({ data: { message: 'ok' } })
+
+    await imageGenerationAPI.deleteConversation(42)
+
+    expect(deleteRequest).toHaveBeenCalledWith('/user/image-generations', {
+      params: { conversation_id: 42 },
+    })
   })
 })

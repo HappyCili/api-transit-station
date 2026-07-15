@@ -202,6 +202,24 @@ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, id, userID)
 	return nil
 }
 
+func (r *imageGenerationRepository) DeleteConversation(ctx context.Context, userID, conversationID int64) error {
+	result, err := r.db.ExecContext(ctx, `
+UPDATE user_image_generations
+SET deleted_at = NOW(), updated_at = NOW()
+WHERE user_id = $1 AND conversation_id = $2 AND deleted_at IS NULL`, userID, conversationID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrImageGenerationNotFound
+	}
+	return nil
+}
+
 func buildImageGenerationWhere(userID int64, filters service.ImageGenerationListFilters) (string, []any) {
 	clauses := []string{"user_id = $1", "deleted_at IS NULL"}
 	args := []any{userID}

@@ -78,6 +78,7 @@ type ImageGenerationRepository interface {
 	ListByUser(ctx context.Context, userID int64, params pagination.PaginationParams, filters ImageGenerationListFilters) ([]ImageGeneration, *pagination.PaginationResult, error)
 	SetFavorite(ctx context.Context, userID, id int64, favorite bool) (*ImageGeneration, error)
 	Delete(ctx context.Context, userID, id int64) error
+	DeleteConversation(ctx context.Context, userID, conversationID int64) error
 }
 
 type ImageGenerationService struct {
@@ -152,6 +153,10 @@ func (s *ImageGenerationService) SetFavorite(ctx context.Context, userID, id int
 
 func (s *ImageGenerationService) Delete(ctx context.Context, userID, id int64) error {
 	return s.repo.Delete(ctx, userID, id)
+}
+
+func (s *ImageGenerationService) DeleteConversation(ctx context.Context, userID, conversationID int64) error {
+	return s.repo.DeleteConversation(ctx, userID, conversationID)
 }
 
 func normalizeJSONRaw(raw json.RawMessage, fallback string) json.RawMessage {

@@ -3,6 +3,10 @@ export default {
     title: '图片生成',
     description: '使用 gpt-image-2 生成和编辑图片',
     newConversation: '新对话',
+    deleteConversation: '删除对话',
+    deleteConversationConfirm: '确定删除对话“{title}”吗？该会话中的全部消息和图片记录都会被删除。',
+    deleteConversationSuccess: '对话已删除',
+    deleteConversationFailed: '删除对话失败',
     emptyHistory: '暂无创作记录',
     generatedImages: '已生成',
     noGeneratedImages: '暂无图片',
@@ -12,7 +16,6 @@ export default {
     welcomeSubtitle: '输入提示词，配置比例、画质和格式后开始生成。',
     promptPlaceholder: '描述你想要的图片...',
     optimizePrompt: '优化提示词',
-    modelThinking: '模型思考',
     addImage: '添加图片',
     generate: '生成图片',
     generating: '正在生成...',
@@ -60,11 +63,6 @@ export default {
     styles: {
       vivid: '鲜艳',
       natural: '自然'
-    },
-    reasoningEfforts: {
-      low: '快速',
-      medium: '标准',
-      high: '深度'
     },
     samples: {
       cat: '一只在星空下弹吉他的猫',

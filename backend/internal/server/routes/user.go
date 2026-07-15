@@ -38,6 +38,7 @@ func RegisterUserRoutes(
 			{
 				imageGenerations.GET("", h.ImageGeneration.List)
 				imageGenerations.POST("", h.ImageGeneration.Create)
+				imageGenerations.DELETE("", h.ImageGeneration.DeleteConversation)
 				imageGenerations.GET("/:id/images/:index/view", h.ImageGeneration.ViewImage)
 				imageGenerations.GET("/:id/images/:index/download", h.ImageGeneration.DownloadImage)
 				imageGenerations.PATCH("/:id/favorite", h.ImageGeneration.SetFavorite)

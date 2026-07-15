@@ -3,6 +3,10 @@ export default {
     title: 'Image Generation',
     description: 'Generate and edit images with gpt-image-2',
     newConversation: 'New Conversation',
+    deleteConversation: 'Delete conversation',
+    deleteConversationConfirm: 'Delete "{title}"? All messages and images in this conversation will be deleted.',
+    deleteConversationSuccess: 'Conversation deleted',
+    deleteConversationFailed: 'Failed to delete conversation',
     emptyHistory: 'No creations yet',
     generatedImages: 'Generated',
     noGeneratedImages: 'No images',
@@ -12,7 +16,6 @@ export default {
     welcomeSubtitle: 'Enter a prompt, configure ratio, quality, and format, then generate.',
     promptPlaceholder: 'Describe the image you want...',
     optimizePrompt: 'Optimize Prompt',
-    modelThinking: 'Model Thinking',
     addImage: 'Add Image',
     generate: 'Generate',
     generating: 'Generating...',
@@ -60,11 +63,6 @@ export default {
     styles: {
       vivid: 'Vivid',
       natural: 'Natural'
-    },
-    reasoningEfforts: {
-      low: 'Fast',
-      medium: 'Standard',
-      high: 'Deep'
     },
     samples: {
       cat: 'A cat playing guitar under a starry sky',

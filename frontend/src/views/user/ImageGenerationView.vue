@@ -1,66 +1,84 @@
 <template>
   <AppLayout>
-    <div class="flex min-h-[calc(100vh-5rem)] flex-col gap-4 lg:flex-row">
-      <aside class="flex w-full flex-col rounded-lg border border-gray-100 bg-white dark:border-dark-700 dark:bg-dark-800 lg:w-72">
-        <div class="border-b border-gray-100 p-4 dark:border-dark-700">
+    <div class="flex min-h-[calc(100dvh-6rem)] min-w-0 flex-col gap-4 md:h-[calc(100dvh-7rem)] md:min-h-0 md:flex-row md:items-stretch md:overflow-hidden lg:h-[calc(100dvh-8rem)]">
+      <aside class="flex h-[clamp(10rem,32dvh,18rem)] w-full flex-none flex-col overflow-hidden rounded-lg border border-gray-100 bg-white dark:border-dark-700 dark:bg-dark-800 sm:h-[clamp(12rem,36dvh,22rem)] md:h-full md:w-52 lg:w-64">
+        <div class="flex-none border-b border-gray-100 p-4 dark:border-dark-700">
           <button class="btn btn-primary w-full justify-center" @click="startNewConversation">
             <Icon name="plus" size="sm" class="mr-2" />
             {{ t('imageGeneration.newConversation') }}
           </button>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-3">
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
           <div v-if="historyLoading" class="flex justify-center py-8">
             <LoadingSpinner size="md" />
           </div>
           <div v-else-if="historyConversations.length === 0" class="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             {{ t('imageGeneration.emptyHistory') }}
           </div>
-          <button
+          <div
             v-for="item in historyConversations"
             :key="item.conversationId"
-            type="button"
-            class="mb-2 w-full rounded-lg border border-transparent p-3 text-left transition-colors hover:border-gray-200 hover:bg-gray-50 dark:hover:border-dark-600 dark:hover:bg-dark-700/60"
-            @click="selectConversation(item)"
+            class="group relative mb-2 rounded-lg border border-transparent transition-colors hover:border-gray-200 hover:bg-gray-50 dark:hover:border-dark-600 dark:hover:bg-dark-700/60"
           >
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.updatedAt) }}</p>
+            <button
+              type="button"
+              data-testid="conversation-history-item"
+              :data-conversation-id="item.conversationId"
+              class="w-full rounded-lg p-3 pr-11 text-left"
+              @click="selectConversation(item)"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.updatedAt) }}</p>
+                </div>
               </div>
-            </div>
-            <div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              <span>{{ item.turnCount }} 轮</span>
-              <span>{{ item.latest.model }}</span>
-              <span>{{ item.latest.size }}</span>
-              <span>{{ item.latest.quality }}</span>
-              <span
-                v-if="isUncertainHistoryRecord(item.latest)"
-                class="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-              >
-                {{ t('imageGeneration.statusUncertain') }}
-              </span>
-              <span
-                v-else-if="item.latest.status === 'failed'"
-                class="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-600 dark:bg-red-900/30 dark:text-red-300"
-              >
-                {{ t('imageGeneration.statusFailed') }}
-              </span>
-            </div>
-            <p v-if="isUncertainHistoryRecord(item.latest)" class="mt-2 break-words text-xs text-amber-700 dark:text-amber-300">
-              {{ t('imageGeneration.generateTimeoutUncertain') }}
-            </p>
-            <p v-else-if="item.latest.status === 'failed' && item.latest.error_message" class="mt-2 break-words text-xs text-red-600 dark:text-red-300">
-              {{ item.latest.error_message }}
-            </p>
-          </button>
+              <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>{{ item.turnCount }} 轮</span>
+                <span>{{ item.latest.model }}</span>
+                <span>{{ item.latest.size }}</span>
+                <span>{{ item.latest.quality }}</span>
+                <span
+                  v-if="isUncertainHistoryRecord(item.latest)"
+                  class="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                >
+                  {{ t('imageGeneration.statusUncertain') }}
+                </span>
+                <span
+                  v-else-if="item.latest.status === 'failed'"
+                  class="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-600 dark:bg-red-900/30 dark:text-red-300"
+                >
+                  {{ t('imageGeneration.statusFailed') }}
+                </span>
+              </div>
+              <p v-if="isUncertainHistoryRecord(item.latest)" class="mt-2 break-words text-xs text-amber-700 dark:text-amber-300">
+                {{ t('imageGeneration.generateTimeoutUncertain') }}
+              </p>
+              <p v-else-if="item.latest.status === 'failed' && item.latest.error_message" class="mt-2 break-words text-xs text-red-600 dark:text-red-300">
+                {{ item.latest.error_message }}
+              </p>
+            </button>
+            <button
+              type="button"
+              data-testid="delete-conversation-button"
+              :data-conversation-id="item.conversationId"
+              :title="t('imageGeneration.deleteConversation')"
+              :aria-label="t('imageGeneration.deleteConversation')"
+              :disabled="conversationDeletePending || (generating && currentConversationId === item.conversationId)"
+              class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+              @click="requestDeleteConversation(item)"
+            >
+              <Icon name="trash" size="sm" />
+            </button>
+          </div>
         </div>
       </aside>
 
-      <main class="flex min-w-0 flex-1 flex-col gap-4">
-        <section class="rounded-lg border border-gray-100 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
-          <div class="flex flex-col gap-4 xl:flex-row">
-            <div class="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row">
+      <main class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:h-full">
+        <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-100 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
+          <div class="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:flex-row">
               <aside class="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/40 lg:w-24 lg:flex-shrink-0">
                 <div class="flex items-center justify-between gap-2 lg:block">
                   <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageGeneration.generatedImages') }}</p>
@@ -68,12 +86,13 @@
                 </div>
                 <div v-if="currentImageEntries.length > 0" class="flex gap-2 overflow-x-auto pb-1 lg:max-h-[520px] lg:flex-col lg:overflow-y-auto lg:pb-0">
                   <button
-                    v-for="entry in currentImageEntries"
+                    v-for="(entry, entryPosition) in currentImageEntries"
                     :key="entry.key"
                     type="button"
+                    data-testid="generated-image-thumbnail"
                     class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border bg-white transition-colors dark:bg-dark-800"
-                    :class="selectedImageIndex === entry.index ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/60' : 'border-gray-200 hover:border-primary-300 dark:border-dark-600'"
-                    @click="selectGeneratedImage(entry.index)"
+                    :class="selectedImageIndex === entryPosition ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/60' : 'border-gray-200 hover:border-primary-300 dark:border-dark-600'"
+                    @click="selectGeneratedImage(entryPosition)"
                   >
                     <img v-if="entry.src" :src="entry.src" :alt="entry.prompt" class="h-full w-full object-cover" />
                     <div v-else class="flex h-full w-full items-center justify-center">
@@ -87,7 +106,7 @@
                 </div>
               </aside>
 
-              <div class="min-h-[420px] min-w-0 flex-1 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/40">
+              <div class="min-h-64 min-w-0 flex-1 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 p-4 md:h-full md:min-h-0 dark:border-dark-700 dark:bg-dark-900/40">
                 <div class="space-y-5">
                   <template v-if="conversationTurns.length > 0">
                     <template v-for="turn in conversationTurns" :key="turn.id">
@@ -95,6 +114,26 @@
                         <div class="max-w-[min(42rem,88%)] rounded-lg rounded-tr-sm bg-primary-600 px-4 py-3 text-white shadow-sm">
                           <div class="mb-1 text-xs font-medium text-primary-100">{{ t('imageGeneration.userLabel') }}</div>
                           <p class="whitespace-pre-wrap break-words text-sm leading-6">{{ turn.prompt }}</p>
+                          <div
+                            v-if="turnReferenceImageEntries(turn).length > 0"
+                            data-testid="conversation-reference-images"
+                            class="mt-3 border-t border-white/20 pt-3"
+                          >
+                            <div class="mb-2 flex items-center gap-2 text-xs font-medium text-primary-100">
+                              <Icon name="link" size="xs" />
+                              <span>{{ t('imageGeneration.referenceImages') }}</span>
+                              <span class="rounded-full bg-white/15 px-1.5 py-0.5">{{ turnReferenceImageEntries(turn).length }}</span>
+                            </div>
+                            <div class="flex gap-2 overflow-x-auto pb-1">
+                              <img
+                                v-for="entry in turnReferenceImageEntries(turn)"
+                                :key="entry.key"
+                                :src="entry.dataUrl"
+                                :alt="entry.prompt"
+                                class="h-14 w-14 flex-shrink-0 rounded-md border border-white/20 object-cover"
+                              />
+                            </div>
+                          </div>
                           <div class="mt-2 flex flex-wrap gap-2 text-xs text-primary-100">
                             <span>{{ turn.model }}</span>
                             <span>{{ turn.size }}</span>
@@ -269,18 +308,18 @@
                         </div>
                       </div>
 
-                      <div v-else class="flex min-h-64 flex-col items-center justify-center px-4 py-8 text-center">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
-                          <Icon name="sparkles" size="lg" />
+                      <div v-else class="flex min-h-48 flex-col items-center justify-center px-3 py-5 text-center md:h-full md:min-h-0">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                          <Icon name="sparkles" size="md" />
                         </div>
-                        <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{{ t('imageGeneration.welcomeTitle') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">{{ t('imageGeneration.welcomeSubtitle') }}</p>
-                        <div class="mt-5 flex flex-wrap justify-center gap-2">
+                        <h2 class="mt-3 text-base font-semibold text-gray-900 dark:text-white">{{ t('imageGeneration.welcomeTitle') }}</h2>
+                        <p class="mt-1 max-w-xl text-sm text-gray-500 dark:text-gray-400">{{ t('imageGeneration.welcomeSubtitle') }}</p>
+                        <div class="mt-3 flex flex-wrap justify-center gap-2">
                           <button
                             v-for="sample in promptSamples"
                             :key="sample"
                             type="button"
-                            class="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-600 dark:border-dark-600 dark:text-gray-300 dark:hover:border-primary-600 dark:hover:text-primary-300"
+                            class="rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-600 dark:border-dark-600 dark:text-gray-300 dark:hover:border-primary-600 dark:hover:text-primary-300"
                             @click="prompt = sample"
                           >
                             {{ sample }}
@@ -293,18 +332,18 @@
               </div>
             </div>
 
-            <aside class="w-full flex-shrink-0 space-y-4 xl:w-80">
-              <div class="rounded-lg border border-gray-100 p-4 dark:border-dark-700">
+            <aside class="w-full flex-shrink-0 space-y-3 md:h-full md:min-h-0 md:w-56 md:overflow-y-auto md:pr-1 xl:w-72">
+              <div class="rounded-lg border border-gray-100 p-3 dark:border-dark-700">
                 <label class="input-label">{{ t('imageGeneration.apiKey') }}</label>
-                <select v-model="selectedApiKeyId" class="input mt-2">
+                <select v-model="selectedApiKeyId" class="input mt-1">
                   <option v-for="option in imageGenerationKeyOptions" :key="option.id" :value="String(option.id)">
                     {{ apiKeyOptionLabel(option) }}
                   </option>
                 </select>
               </div>
 
-              <div class="rounded-lg border border-gray-100 p-4 dark:border-dark-700">
-                <div class="mb-3 flex items-center justify-between">
+              <div class="rounded-lg border border-gray-100 p-3 dark:border-dark-700">
+                <div class="mb-2 flex items-center justify-between">
                   <label class="input-label">{{ t('imageGeneration.model') }}</label>
                   <span class="text-xs text-gray-500 dark:text-gray-400">{{ costHint }}</span>
                 </div>
@@ -318,12 +357,12 @@
               <ControlGroup :label="t('imageGeneration.outputFormat')" :options="formatOptions" v-model="outputFormat" />
               <ControlGroup :label="t('imageGeneration.count')" :options="countOptions" v-model="countValue" />
 
-              <div class="rounded-lg border border-gray-100 p-4 dark:border-dark-700">
+              <div class="rounded-lg border border-gray-100 p-3 dark:border-dark-700">
                 <label class="flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-200">
                   <span>{{ t('imageGeneration.transparentBackground') }}</span>
                   <input v-model="transparentBackground" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                 </label>
-                <label class="mt-4 block text-sm text-gray-700 dark:text-gray-200">
+                <label class="mt-3 block text-sm text-gray-700 dark:text-gray-200">
                   {{ t('imageGeneration.compression') }}
                   <input v-model.number="outputCompression" type="range" min="0" max="100" class="mt-2 w-full" />
                   <span class="text-xs text-gray-500 dark:text-gray-400">{{ outputCompression }}</span>
@@ -333,8 +372,8 @@
           </div>
         </section>
 
-        <section class="rounded-lg border border-gray-100 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
-          <div v-if="referenceImageEntries.length > 0" class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-900/40">
+        <section class="flex-none rounded-lg border border-gray-100 bg-white p-3 dark:border-dark-700 dark:bg-dark-800 md:p-4">
+          <div v-if="referenceImageEntries.length > 0" data-testid="reference-image-picker" class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-900/40">
             <div class="mb-2 flex items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 <Icon name="link" size="sm" class="flex-shrink-0" />
@@ -360,8 +399,8 @@
           </div>
           <textarea
             v-model="prompt"
-            rows="4"
-            class="input min-h-28 resize-y"
+            rows="3"
+            class="input min-h-20 max-h-32 resize-y"
             :placeholder="t('imageGeneration.promptPlaceholder')"
             @keydown.enter="handlePromptEnter"
           ></textarea>
@@ -379,21 +418,6 @@
                 <Icon name="sparkles" size="sm" class="mr-2" />
                 {{ t('imageGeneration.optimizePrompt') }}
               </button>
-              <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-1 dark:border-dark-600 dark:bg-dark-800">
-                <span class="px-2 text-sm font-medium text-gray-600 dark:text-gray-300">{{ t('imageGeneration.modelThinking') }}</span>
-                <div class="flex rounded-md bg-gray-100 p-0.5 dark:bg-dark-700">
-                  <button
-                    v-for="option in reasoningEffortOptions"
-                    :key="option.value"
-                    type="button"
-                    class="rounded px-2.5 py-1 text-sm font-medium transition-colors"
-                    :class="reasoningEffort === option.value ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'"
-                    @click="setReasoningEffort(option.value)"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
-              </div>
             </div>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               <button type="button" class="btn btn-secondary justify-center" :disabled="generating" @click="openReferenceImagePicker">
@@ -410,6 +434,17 @@
         </section>
       </main>
     </div>
+
+    <ConfirmDialog
+      :show="conversationPendingDelete !== null"
+      :title="t('imageGeneration.deleteConversation')"
+      :message="t('imageGeneration.deleteConversationConfirm', { title: conversationPendingDelete?.title || '' })"
+      :confirm-text="t('common.delete')"
+      :cancel-text="t('common.cancel')"
+      :danger="true"
+      @confirm="confirmDeleteConversation"
+      @cancel="cancelDeleteConversation"
+    />
   </AppLayout>
 </template>
 
@@ -418,6 +453,7 @@ import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } 
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import keysAPI from '@/api/keys'
@@ -431,7 +467,6 @@ import imageGenerationAPI, {
   type ImageGenerationPayload,
   type ImageOutputFormat,
   type ImageQuality,
-  type ImageReasoningEffort,
   type ImageStyle,
   type OpenAIImageData,
 } from '@/api/imageGeneration'
@@ -447,13 +482,13 @@ const ControlGroup = defineComponent({
   emits: ['update:modelValue'],
   setup(props, { emit }) {
     return () =>
-      h('div', { class: 'rounded-lg border border-gray-100 p-4 dark:border-dark-700' }, [
-        h('div', { class: 'input-label mb-3' }, props.label),
+      h('div', { class: 'rounded-lg border border-gray-100 p-3 dark:border-dark-700' }, [
+        h('div', { class: 'input-label mb-2' }, props.label),
         h('div', { class: 'flex flex-wrap gap-2' }, props.options.map((option) =>
           h('button', {
             type: 'button',
             class: [
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              'rounded-lg px-2.5 py-1 text-sm font-medium transition-colors',
               props.modelValue === option.value
                 ? 'bg-primary-600 text-white shadow-sm'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600',
@@ -490,6 +525,13 @@ interface ImageEntry {
   prompt: string
 }
 
+interface ImageSource {
+  image: OpenAIImageData
+  index: number
+  historyId: number | null
+  prompt: string
+}
+
 interface ReferenceImageEntry {
   dataUrl: string
   prompt: string
@@ -506,6 +548,8 @@ const apiKeys = ref<ApiKey[]>([])
 const historyItems = ref<ImageGenerationHistoryRecord[]>([])
 const historyLoading = ref(false)
 const generating = ref(false)
+const conversationPendingDelete = ref<ImageGenerationConversationItem | null>(null)
+const conversationDeletePending = ref(false)
 const prompt = ref('')
 const submittedPrompt = ref('')
 const currentResultPrompt = ref('')
@@ -515,7 +559,6 @@ const size = ref<ImageAspectRatio>('1:1')
 const quality = ref<ImageQuality>('high')
 const outputFormat = ref<ImageOutputFormat>('webp')
 const countValue = ref('1')
-const reasoningEffort = ref<ImageReasoningEffort>('medium')
 const transparentBackground = ref(false)
 const outputCompression = ref(80)
 const currentImages = ref<OpenAIImageData[]>([])
@@ -534,6 +577,8 @@ const imageClipboardDataURLs = ref<Record<string, string>>({})
 const imagePreviewErrors = ref<Record<string, boolean>>({})
 const referenceFileInput = ref<HTMLInputElement | null>(null)
 const managedImagePreviewUrls = new Set<string>()
+let imagePreviewRefreshVersion = 0
+let conversationSelectionVersion = 0
 
 const imageGenerationKeyOptions = computed(() =>
   apiKeys.value.filter((key) =>
@@ -588,19 +633,36 @@ const historyConversations = computed<ImageGenerationConversationItem[]>(() => {
     }))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 })
+const currentImageSources = computed<ImageSource[]>(() => {
+  if (conversationTurns.value.length > 0) {
+    return conversationTurns.value.flatMap((turn) => (turn.images || []).map((image, index) => ({
+      image,
+      index,
+      historyId: turn.id,
+      prompt: image.revised_prompt || turn.prompt,
+    })))
+  }
+
+  return currentImages.value.map((image, index) => ({
+    image,
+    index,
+    historyId: currentHistoryId.value,
+    prompt: image.revised_prompt || currentResultPrompt.value || submittedPrompt.value,
+  }))
+})
 const currentImageEntries = computed<ImageEntry[]>(() =>
-  currentImages.value.map((image, index) => {
-    const key = imagePreviewKey(image, index, currentHistoryId.value)
+  currentImageSources.value.map(({ image, index, historyId, prompt: imagePrompt }) => {
+    const key = imagePreviewKey(image, index, historyId)
     const hasPreviewResult = Object.prototype.hasOwnProperty.call(imagePreviewUrls.value, key)
     return {
       image,
       index,
-      historyId: currentHistoryId.value,
+      historyId,
       key,
       src: imagePreviewUrls.value[key] || '',
       loading: !hasPreviewResult,
       failed: imagePreviewErrors.value[key] === true,
-      prompt: image.revised_prompt || currentResultPrompt.value || submittedPrompt.value,
+      prompt: imagePrompt,
     }
   }),
 )
@@ -640,12 +702,6 @@ const countOptions = [
   { label: '2', value: '2' },
   { label: '4', value: '4' },
 ]
-const reasoningEffortOptions = computed<Array<{ label: string; value: ImageReasoningEffort }>>(() => [
-  { label: t('imageGeneration.reasoningEfforts.low'), value: 'low' },
-  { label: t('imageGeneration.reasoningEfforts.medium'), value: 'medium' },
-  { label: t('imageGeneration.reasoningEfforts.high'), value: 'high' },
-])
-
 watch(imageGenerationKeyOptions, (keys) => {
   if (keys.length === 0) {
     selectedApiKeyId.value = ''
@@ -709,7 +765,7 @@ function isUncertainHistoryRecord(item: ImageGenerationHistoryRecord): boolean {
   return item.status === 'failed' && isTimeoutUncertainMessage(item.error_message)
 }
 
-function resetGenerationDialog(clearPrompt = false) {
+function resetGenerationResult(clearPrompt = false) {
   if (clearPrompt) {
     prompt.value = ''
   }
@@ -718,8 +774,6 @@ function resetGenerationDialog(clearPrompt = false) {
   currentImages.value = []
   currentFailureMessage.value = ''
   currentWarningMessage.value = ''
-  currentConversationId.value = null
-  conversationTurns.value = []
   currentHistoryId.value = null
   referenceImages.value = []
   selectedImageIndex.value = 0
@@ -727,10 +781,14 @@ function resetGenerationDialog(clearPrompt = false) {
 }
 
 function startNewConversation() {
-  resetGenerationDialog(true)
+  conversationSelectionVersion += 1
+  resetGenerationResult(true)
+  currentConversationId.value = null
+  conversationTurns.value = []
 }
 
 async function selectConversation(item: ImageGenerationConversationItem) {
+  const selectionVersion = ++conversationSelectionVersion
   clearImagePreviewUrls()
   currentConversationId.value = item.conversationId
   conversationTurns.value = sortConversationTurns(item.turns)
@@ -742,11 +800,45 @@ async function selectConversation(item: ImageGenerationConversationItem) {
       page_size: 100,
       conversation_id: item.conversationId,
     })
+    if (selectionVersion !== conversationSelectionVersion || currentConversationId.value !== item.conversationId) return
     conversationTurns.value = sortConversationTurns(result.items)
     const latest = conversationTurns.value[conversationTurns.value.length - 1] || item.latest
     applyHistoryRecord(latest)
   } catch (err: unknown) {
+    if (selectionVersion !== conversationSelectionVersion) return
     appStore.showError(extractApiErrorMessage(err, t('imageGeneration.loadHistoryFailed')))
+  }
+}
+
+function requestDeleteConversation(item: ImageGenerationConversationItem) {
+  conversationPendingDelete.value = item
+}
+
+function cancelDeleteConversation() {
+  if (!conversationDeletePending.value) {
+    conversationPendingDelete.value = null
+  }
+}
+
+async function confirmDeleteConversation() {
+  const item = conversationPendingDelete.value
+  if (!item || conversationDeletePending.value) return
+
+  conversationDeletePending.value = true
+  try {
+    await imageGenerationAPI.deleteConversation(item.conversationId)
+    historyItems.value = historyItems.value.filter((historyItem) =>
+      recordConversationId(historyItem) !== item.conversationId,
+    )
+    if (currentConversationId.value === item.conversationId) {
+      startNewConversation()
+    }
+    conversationPendingDelete.value = null
+    appStore.showSuccess(t('imageGeneration.deleteConversationSuccess'))
+  } catch (err: unknown) {
+    appStore.showError(extractApiErrorMessage(err, t('imageGeneration.deleteConversationFailed')))
+  } finally {
+    conversationDeletePending.value = false
   }
 }
 
@@ -762,8 +854,7 @@ function applyHistoryRecord(item: ImageGenerationHistoryRecord, syncPrompt = tru
   quality.value = normalizeQuality(item.quality)
   outputFormat.value = normalizeOutputFormat(item.output_format)
   countValue.value = String(Math.min(Math.max(item.n || 1, 1), 4))
-  reasoningEffort.value = normalizeReasoningEffort(item.request?.reasoning_effort)
-  referenceImages.value = normalizeReferenceImages(item.reference_images, item.prompt)
+  referenceImages.value = []
   currentImages.value = item.images || []
   currentFailureMessage.value = item.status === 'failed' && !isUncertainHistoryRecord(item)
     ? item.error_message || t('imageGeneration.generateFailed')
@@ -812,26 +903,16 @@ function normalizeOutputFormat(value: string): ImageOutputFormat {
   return value === 'png' || value === 'jpeg' || value === 'webp' ? value : 'webp'
 }
 
-function normalizeReasoningEffort(value: unknown): ImageReasoningEffort {
-  return value === 'low' || value === 'high' ? value : 'medium'
-}
-
-function setReasoningEffort(value: ImageReasoningEffort) {
-  reasoningEffort.value = value
-}
-
 function selectGeneratedImage(index: number) {
   selectedImageIndex.value = index
 }
 
-function normalizeReferenceImages(values: string[], promptText: string): ReferenceImageEntry[] {
-  return values
-    .filter((value) => typeof value === 'string' && value.trim() !== '')
-    .map((value, index) => ({
-      dataUrl: value,
-      prompt: promptText,
-      sourceKey: `history-reference:${index}:${value.slice(0, 48)}`,
-    }))
+function turnReferenceImageEntries(turn: ImageGenerationHistoryRecord) {
+  return turn.reference_images.map((dataUrl, index) => ({
+    dataUrl,
+    prompt: turn.prompt,
+    key: `${turn.id}:${index}`,
+  }))
 }
 
 async function addReferenceImage(entry: ImageEntry) {
@@ -993,7 +1074,6 @@ function buildPayload(promptText: string, activeReferenceImages: ReferenceImageE
     output_format: transparentBackground.value ? 'png' : outputFormat.value,
     output_compression: outputFormat.value === 'webp' || outputFormat.value === 'jpeg' ? outputCompression.value : undefined,
     moderation: 'auto',
-    reasoning_effort: reasoningEffort.value,
     reference_images: activeReferenceImages.length > 0 ? activeReferenceImages.map((image) => image.dataUrl) : undefined,
   }
   return payload
@@ -1014,10 +1094,6 @@ async function buildEditForm(payload: ImageGenerationPayload, activeReferenceIma
   if (payload.output_compression !== undefined) {
     form.append('output_compression', String(payload.output_compression))
   }
-  if (payload.reasoning_effort) {
-    form.append('reasoning_effort', payload.reasoning_effort)
-  }
-
   for (const [index, image] of activeReferenceImages.entries()) {
     const blob = await referenceImageToBlob(image)
     form.append(referenceImageFieldName(index, activeReferenceImages.length), blob, referenceImageFileName(blob, index))
@@ -1044,7 +1120,7 @@ async function generateImage() {
   if (!canGenerate.value) return
   const promptText = prompt.value.trim()
   const activeReferenceImages = [...referenceImages.value]
-  resetGenerationDialog()
+  resetGenerationResult()
   submittedPrompt.value = promptText
   currentResultPrompt.value = promptText
   prompt.value = ''
@@ -1337,22 +1413,20 @@ function compactImageHistoryData(images: OpenAIImageData[]): OpenAIImageData[] {
 
 async function refreshImagePreviewUrls() {
   clearImagePreviewUrls()
+  const refreshVersion = imagePreviewRefreshVersion
   const entries: Record<string, string> = {}
   const blobs: Record<string, Blob> = {}
   const clipboardBlobs: Record<string, Blob> = {}
   const clipboardDataURLs: Record<string, string> = {}
   const errors: Record<string, boolean> = {}
+  const refreshPreviewUrls = new Set<string>()
 
-  const sources = conversationTurns.value.length > 0
-    ? conversationTurns.value.flatMap((turn) => (turn.images || []).map((image, index) => ({ image, index, historyId: turn.id })))
-    : currentImages.value.map((image, index) => ({ image, index, historyId: currentHistoryId.value }))
-
-  await Promise.all(sources.map(async ({ image, index, historyId }) => {
+  await Promise.all(currentImageSources.value.map(async ({ image, index, historyId }) => {
     const key = imagePreviewKey(image, index, historyId)
     try {
       const blob = await generatedImageToBlob(image, index, 'view', historyId)
       const url = URL.createObjectURL(blob)
-      managedImagePreviewUrls.add(url)
+      refreshPreviewUrls.add(url)
       entries[key] = url
       blobs[key] = blob
       const clipboardBlob = await clipboardCompatibleImageBlob(blob)
@@ -1365,6 +1439,13 @@ async function refreshImagePreviewUrls() {
       errors[key] = true
     }
   }))
+
+  if (refreshVersion !== imagePreviewRefreshVersion) {
+    refreshPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
+    return
+  }
+
+  refreshPreviewUrls.forEach((url) => managedImagePreviewUrls.add(url))
   imagePreviewUrls.value = entries
   imagePreviewBlobs.value = blobs
   imageClipboardBlobs.value = clipboardBlobs
@@ -1373,6 +1454,7 @@ async function refreshImagePreviewUrls() {
 }
 
 function clearImagePreviewUrls() {
+  imagePreviewRefreshVersion += 1
   managedImagePreviewUrls.forEach((url) => URL.revokeObjectURL(url))
   managedImagePreviewUrls.clear()
   imagePreviewUrls.value = {}
@@ -1402,11 +1484,11 @@ watch([currentImages, conversationTurns, currentHistoryId, outputFormat], () => 
   void refreshImagePreviewUrls()
 }, { deep: true })
 
-watch(currentImages, () => {
-  if (selectedImageIndex.value >= currentImages.value.length) {
+watch(() => currentImageEntries.value.length, (imageCount) => {
+  if (selectedImageIndex.value >= imageCount) {
     selectedImageIndex.value = 0
   }
-}, { deep: true })
+})
 
 onBeforeUnmount(() => {
   clearImagePreviewUrls()

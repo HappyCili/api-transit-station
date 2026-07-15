@@ -114,3 +114,31 @@ func TestImageGenerationRepositoryCreate_NormalizesNewConversation(t *testing.T)
 	require.JSONEq(t, string(imagesJSON), string(item.Images))
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestImageGenerationRepositoryDeleteConversation_SoftDeletesEveryTurn(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &imageGenerationRepository{db: db}
+
+	mock.ExpectExec("UPDATE user_image_generations").
+		WithArgs(int64(7), int64(101)).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+
+	err := repo.DeleteConversation(context.Background(), 7, 101)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestImageGenerationRepositoryDeleteConversation_ReturnsNotFound(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &imageGenerationRepository{db: db}
+
+	mock.ExpectExec("UPDATE user_image_generations").
+		WithArgs(int64(7), int64(404)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := repo.DeleteConversation(context.Background(), 7, 404)
+
+	require.ErrorIs(t, err, service.ErrImageGenerationNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

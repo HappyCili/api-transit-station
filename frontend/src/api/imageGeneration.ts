@@ -17,7 +17,6 @@ export type ImageGenerationRequestSize = `${number}x${number}`
 export type ImageOutputFormat = 'webp' | 'png' | 'jpeg'
 export type ImageStyle = 'vivid' | 'natural'
 export type ImageBackground = 'auto' | 'opaque' | 'transparent'
-export type ImageReasoningEffort = 'low' | 'medium' | 'high'
 
 const IMAGE_GENERATION_SIZE_MAP: Record<ImageQuality, Record<ImageAspectRatio, ImageGenerationRequestSize>> = {
   low: {
@@ -71,7 +70,6 @@ export interface ImageGenerationPayload {
   output_format: ImageOutputFormat
   output_compression?: number
   moderation: 'auto' | 'low'
-  reasoning_effort?: ImageReasoningEffort
   reference_images?: string[]
 }
 
@@ -194,6 +192,13 @@ async function deleteHistory(id: number): Promise<{ message: string }> {
   return data
 }
 
+async function deleteConversation(conversationId: number): Promise<{ message: string }> {
+  const { data } = await apiClient.delete<{ message: string }>('/user/image-generations', {
+    params: { conversation_id: conversationId },
+  })
+  return data
+}
+
 async function downloadHistoryImage(id: number, index: number): Promise<Blob> {
   const { data } = await apiClient.get<Blob>(`/user/image-generations/${id}/images/${index}/download`, {
     responseType: 'blob',
@@ -215,6 +220,7 @@ export const imageGenerationAPI = {
   listHistory,
   saveHistory,
   deleteHistory,
+  deleteConversation,
   downloadHistoryImage,
   viewHistoryImage,
 }

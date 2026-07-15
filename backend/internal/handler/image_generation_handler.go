@@ -277,6 +277,24 @@ func (h *ImageGenerationHandler) Delete(c *gin.Context) {
 	response.Success(c, gin.H{"message": "ok"})
 }
 
+func (h *ImageGenerationHandler) DeleteConversation(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	conversationID, err := strconv.ParseInt(strings.TrimSpace(c.Query("conversation_id")), 10, 64)
+	if err != nil || conversationID <= 0 {
+		response.BadRequest(c, "Invalid conversation ID")
+		return
+	}
+	if err := h.imageGenerationService.DeleteConversation(c.Request.Context(), subject.UserID, conversationID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "ok"})
+}
+
 func parseImageGenerationID(c *gin.Context) (int64, bool) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
