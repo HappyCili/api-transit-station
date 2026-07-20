@@ -63,10 +63,7 @@ func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *
 	s.sessionStore.Set(sessionID, session)
 
 	codeChallenge := antigravity.GenerateCodeChallenge(codeVerifier)
-	authURL, err := antigravity.BuildAuthorizationURL(state, codeChallenge)
-	if err != nil {
-		return nil, err
-	}
+	authURL := antigravity.BuildAuthorizationURL(state, codeChallenge)
 
 	return &AntigravityAuthURLResult{
 		AuthURL:   authURL,

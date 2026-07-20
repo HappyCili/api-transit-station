@@ -12,8 +12,8 @@ import (
 func TestResolveLogFilePath_Default(t *testing.T) {
 	t.Setenv("DATA_DIR", "")
 	got := resolveLogFilePath("")
-	if got != DefaultLogPath {
-		t.Fatalf("resolveLogFilePath() = %q, want %q", got, DefaultLogPath)
+	if got != DefaultContainerLogPath {
+		t.Fatalf("resolveLogFilePath() = %q, want %q", got, DefaultContainerLogPath)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestNormalizedOptions_InvalidFallback(t *testing.T) {
 	if !out.Output.ToStdout {
 		t.Fatalf("normalized output should fallback to stdout")
 	}
-	if out.Output.FilePath != DefaultLogPath {
+	if out.Output.FilePath != DefaultContainerLogPath {
 		t.Fatalf("normalized file path = %q", out.Output.FilePath)
 	}
 	if out.Rotation.MaxSizeMB != 100 {

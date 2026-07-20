@@ -38,6 +38,41 @@ import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import checker from 'vite-plugin-checker';
 import { resolve } from 'path';
+function escapeHtml(value) {
+    return value.replace(/[&<>"']/g, function (character) { return ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    })[character] || character; });
+}
+function isSafeImageUrl(value) {
+    var trimmed = value.trim();
+    if ((trimmed.startsWith('/') && !trimmed.startsWith('//')) || /^data:image\//i.test(trimmed)) {
+        return true;
+    }
+    try {
+        var parsed = new URL(trimmed);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    }
+    catch (_a) {
+        return false;
+    }
+}
+function injectBranding(html, config) {
+    var _a, _b;
+    var brandedHtml = html;
+    var siteName = (_a = config.site_name) === null || _a === void 0 ? void 0 : _a.trim();
+    if (siteName) {
+        brandedHtml = brandedHtml.replace(/<title>[^<]*<\/title>/i, "<title>".concat(escapeHtml(siteName), " - AI API Gateway</title>"));
+    }
+    var siteLogo = (_b = config.site_logo) === null || _b === void 0 ? void 0 : _b.trim();
+    if (siteLogo && isSafeImageUrl(siteLogo)) {
+        brandedHtml = brandedHtml.replace(/<link\s+rel=["']icon["'][^>]*>/i, "<link rel=\"icon\" href=\"".concat(escapeHtml(siteLogo), "\" />"));
+    }
+    return brandedHtml;
+}
 /**
  * Vite 插件：开发模式下注入公开配置到 index.html
  * 与生产模式的后端注入行为保持一致，消除闪烁
@@ -66,7 +101,7 @@ function injectPublicSettings(backendUrl) {
                                 data = _a.sent();
                                 if (data.code === 0 && data.data) {
                                     script = "<script>window.__APP_CONFIG__=".concat(JSON.stringify(data.data), ";</script>");
-                                    return [2 /*return*/, html.replace('</head>', "".concat(script, "\n</head>"))];
+                                    return [2 /*return*/, injectBranding(html, data.data).replace('</head>', "".concat(script, "\n</head>"))];
                                 }
                                 _a.label = 3;
                             case 3: return [3 /*break*/, 5];
@@ -86,8 +121,8 @@ export default defineConfig(function (_a) {
     var mode = _a.mode;
     // 加载环境变量
     var env = loadEnv(mode, process.cwd(), '');
-    var backendUrl = env.VITE_DEV_PROXY_TARGET || 'http://localhost:59528';
-    var devPort = Number(env.VITE_DEV_PORT || 59527);
+    var backendUrl = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080';
+    var devPort = Number(env.VITE_DEV_PORT || 3000);
     return {
         plugins: [
             vue(),
@@ -137,6 +172,10 @@ export default defineConfig(function (_a) {
                             // 国际化
                             if (id.includes('/vue-i18n/') || id.includes('/@intlify/')) {
                                 return 'vendor-i18n';
+                            }
+                            // Stripe 仅在支付流程中按需加载，避免进入首页公共依赖。
+                            if (id.includes('/@stripe/stripe-js/')) {
+                                return 'vendor-stripe';
                             }
                             // 其他小型第三方库合并
                             return 'vendor-misc';

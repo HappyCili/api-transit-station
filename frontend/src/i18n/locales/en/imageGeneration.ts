@@ -46,6 +46,8 @@ export default {
     copyFailed: 'Copy failed',
     generateSuccess: 'Image generation completed',
     generateFailed: 'Image generation failed',
+    retry: 'Retry',
+    retryUnavailable: 'This failed task does not have a complete request record and cannot be retried',
     failedTitle: 'Task failed',
     resultUncertainTitle: 'Result not confirmed',
     generateTimeoutUncertain: 'The request waited too long and the result is not confirmed yet. It was not recorded as failed; refresh later or check usage records to confirm whether it completed.',

@@ -21,6 +21,7 @@ export async function list(
     search?: string
     status?: string
     group_id?: number | string
+    image_generation_enabled?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },

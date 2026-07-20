@@ -126,6 +126,44 @@ func TestAPIKeyRepositoryListByUserIDAttachesLastUsedIP(t *testing.T) {
 	require.Nil(t, byID[noLogs.ID].LastUsedIP)
 }
 
+func TestAPIKeyRepositoryListByUserIDFiltersImageGenerationEnabledGroups(t *testing.T) {
+	repo, client := newAPIKeyRepoSQLite(t)
+	ctx := context.Background()
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "list-image-enabled@test.com")
+
+	createGroup := func(name, platform string, allowImageGeneration bool) int64 {
+		t.Helper()
+		group, err := client.Group.Create().
+			SetName(name).
+			SetPlatform(platform).
+			SetStatus(service.StatusActive).
+			SetAllowImageGeneration(allowImageGeneration).
+			Save(ctx)
+		require.NoError(t, err)
+		return group.ID
+	}
+
+	enabledGroupID := createGroup("openai-image-enabled", service.PlatformOpenAI, true)
+	disabledGroupID := createGroup("openai-image-disabled", service.PlatformOpenAI, false)
+	geminiGroupID := createGroup("gemini-image-enabled", service.PlatformGemini, true)
+
+	enabledKey := &service.APIKey{UserID: user.ID, Key: "sk-image-enabled", Name: "Enabled", GroupID: &enabledGroupID, Status: service.StatusActive}
+	disabledKey := &service.APIKey{UserID: user.ID, Key: "sk-image-disabled", Name: "Disabled", GroupID: &disabledGroupID, Status: service.StatusActive}
+	geminiKey := &service.APIKey{UserID: user.ID, Key: "sk-gemini-image", Name: "Gemini", GroupID: &geminiGroupID, Status: service.StatusActive}
+	ungroupedKey := &service.APIKey{UserID: user.ID, Key: "sk-image-ungrouped", Name: "Ungrouped", Status: service.StatusActive}
+	for _, key := range []*service.APIKey{enabledKey, disabledKey, geminiKey, ungroupedKey} {
+		require.NoError(t, repo.Create(ctx, key))
+	}
+
+	keys, page, err := repo.ListByUserID(ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10}, service.APIKeyListFilters{
+		ImageGenerationEnabled: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), page.Total)
+	require.Len(t, keys, 1)
+	require.Equal(t, enabledKey.ID, keys[0].ID)
+}
+
 func TestLatestUsageLogIPsQueryPostgresUsesPerKeyLateralLookup(t *testing.T) {
 	query, args := latestUsageLogIPsQuery([]int64{11, 22}, dialect.Postgres)
 	normalizedQuery := strings.Join(strings.Fields(query), " ")

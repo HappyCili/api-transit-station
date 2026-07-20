@@ -28,6 +28,8 @@ usage() {
 Usage: ./run_image_generation_dev.sh [options]
 
 Start the Sub2API backend and frontend dev server for the image generation page.
+Existing listeners on the selected frontend port and configured backend port are
+stopped before their replacements are started.
 
 Options:
   --frontend-only          Only start the frontend dev server.
@@ -72,6 +74,77 @@ fail() {
 run() {
   printf '+ %s\n' "$*"
   "$@"
+}
+
+validate_port() {
+  local port="$1"
+  local label="$2"
+
+  [[ "$port" =~ ^[0-9]+$ ]] || fail "$label port must be a number: $port"
+  (( port >= 1 && port <= 65535 )) || fail "$label port must be between 1 and 65535: $port"
+}
+
+listener_pids() {
+  local port="$1"
+  lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+}
+
+stop_port_listeners() {
+  local port="$1"
+  local label="$2"
+  local pids=""
+  local pid=""
+  local attempt=""
+
+  validate_port "$port" "$label"
+  command -v lsof >/dev/null 2>&1 || fail "lsof is required to replace an existing $label listener"
+
+  pids="$(listener_pids "$port")"
+  [[ -n "$pids" ]] || return 0
+
+  log "Stopping existing $label listener(s) on port $port: $pids"
+  for pid in $pids; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  for attempt in {1..20}; do
+    sleep 0.25
+    pids="$(listener_pids "$port")"
+    [[ -n "$pids" ]] || return 0
+  done
+
+  warn "Force stopping existing $label listener(s) on port $port: $pids"
+  for pid in $pids; do
+    kill -9 "$pid" >/dev/null 2>&1 || true
+  done
+
+  for attempt in {1..20}; do
+    sleep 0.25
+    pids="$(listener_pids "$port")"
+    [[ -n "$pids" ]] || return 0
+  done
+
+  fail "Unable to stop existing $label listener(s) on port $port: $pids"
+}
+
+backend_port_from_config() {
+  local config_path="$1"
+  local port=""
+
+  port="$(awk '
+    /^[[:space:]]*server:[[:space:]]*$/ { in_server = 1; next }
+    in_server && /^[^[:space:]]/ { exit }
+    in_server && /^[[:space:]]+port:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*port:[[:space:]]*/, "", value)
+      sub(/[[:space:]#].*$/, "", value)
+      print value
+      exit
+    }
+  ' "$config_path")"
+  [[ -n "$port" ]] || fail "Unable to read server.port from backend config: $config_path"
+  validate_port "$port" "backend"
+  printf '%s\n' "$port"
 }
 
 cleanup() {
@@ -197,8 +270,9 @@ start_backend() {
 
   cd "$BACKEND_DIR"
 
-  resolve_backend_runner
   prepare_backend_config
+  stop_port_listeners "$(backend_port_from_config "$BACKEND_CONFIG_EFFECTIVE")" "backend"
+  resolve_backend_runner
 
   log "Starting backend: ${BACKEND_PARTS[*]}"
   if [[ -n "$BACKEND_CONFIG_TMP_DIR" ]]; then
@@ -306,6 +380,7 @@ start_frontend() {
   local pnpm_cmd="$1"
   read -r -a pnpm_parts <<< "$pnpm_cmd"
 
+  stop_port_listeners "$FRONTEND_PORT" "frontend"
   cd "$FRONTEND_DIR"
 
   log "Starting frontend dev server"

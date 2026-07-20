@@ -64,7 +64,7 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 		Platform: PlatformGemini,
 		Type:     AccountTypeOAuth,
 		Credentials: map[string]any{
-			"access_token": "test-access-token",
+			"access_token": "ya29.test-token",
 			"project_id":   "project-1",
 		},
 		Concurrency: 1,
@@ -85,7 +85,7 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 
 	require.NotNil(t, httpStub.lastReq)
 	require.Contains(t, httpStub.lastReq.URL.String(), "/v1internal:streamGenerateContent?alt=sse")
-	require.Equal(t, "Bearer test-access-token", httpStub.lastReq.Header.Get("Authorization"))
+	require.Equal(t, "Bearer ya29.test-token", httpStub.lastReq.Header.Get("Authorization"))
 	require.Empty(t, httpStub.lastReq.Header.Get("x-api-key"))
 	require.Empty(t, httpStub.lastReq.Header.Get("anthropic-version"))
 

@@ -87,6 +87,36 @@ const historyRecord = {
   updated_at: '2026-06-22T10:00:00Z',
 }
 
+const retryRequest = {
+  model: 'gpt-image-2',
+  prompt: 'Retry the cat with a transparent background',
+  n: 2,
+  size: '2160x2160',
+  quality: 'high',
+  response_format: 'url',
+  style: 'natural',
+  background: 'transparent',
+  output_format: 'png',
+  output_compression: 55,
+  moderation: 'auto',
+  reference_images: [imageDataURL],
+}
+
+const failedHistoryRecord = {
+  ...historyRecord,
+  id: 12,
+  turn_index: 2,
+  prompt: retryRequest.prompt,
+  n: retryRequest.n,
+  request: retryRequest,
+  reference_images: [imageDataURL],
+  images: [],
+  status: 'failed',
+  error_message: 'Upstream temporarily unavailable',
+  created_at: '2026-06-22T10:02:00Z',
+  updated_at: '2026-06-22T10:02:00Z',
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((resolvePromise) => {
@@ -168,6 +198,42 @@ describe('ImageGenerationView', () => {
       created_at: '2026-06-22T10:01:00Z',
       updated_at: '2026-06-22T10:01:00Z',
     }))
+  })
+
+  it('requests image-generation keys from the backend', async () => {
+    keysList.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          key: 'sk-image-enabled',
+          name: 'Image enabled',
+          status: 'active',
+          group: { name: 'Image enabled group', platform: 'openai', allow_image_generation: true },
+        },
+      ],
+    })
+
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(keysList).toHaveBeenCalledWith(1, 100, {
+      status: 'active',
+      image_generation_enabled: true,
+    })
+    const apiKeySelect = wrapper.findAll('select')[0]
+    expect(apiKeySelect.element.value).toBe('1')
+    expect(apiKeySelect.findAll('option').map((option) => option.text())).toEqual([
+      'Image enabled · Image enabled group',
+    ])
   })
 
   it('edits from a generated image reference with multipart image input', async () => {
@@ -634,5 +700,185 @@ describe('ImageGenerationView', () => {
       const sources = wrapper.findAll('[data-testid="generated-image-thumbnail"] img').map((image) => image.attributes('src'))
       expect(sources).toEqual(['blob:new-first', 'blob:new-second'])
     })
+  })
+
+  it('shows retry only for confirmed failed history turns', async () => {
+    listHistory.mockResolvedValue({
+      items: [failedHistoryRecord],
+      total: 1,
+      page: 1,
+      page_size: 50,
+    })
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const historyButton = wrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    expect(historyButton).toBeTruthy()
+    await historyButton!.trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="retry-failed-generation-button"]').exists()).toBe(true))
+
+    listHistory.mockResolvedValue({
+      items: [{
+        ...failedHistoryRecord,
+        id: 13,
+        error_message: 'timeout of 300000ms exceeded',
+      }],
+      total: 1,
+      page: 1,
+      page_size: 50,
+    })
+    const uncertainWrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const uncertainHistoryButton = uncertainWrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    expect(uncertainHistoryButton).toBeTruthy()
+    await uncertainHistoryButton!.trigger('click')
+    expect(uncertainWrapper.find('[data-testid="retry-failed-generation-button"]').exists()).toBe(false)
+  })
+
+  it('retries a failed turn with its saved request and reference images', async () => {
+    const editRequest = deferred<{
+      created: number
+      data: Array<{ b64_json: string; revised_prompt: string }>
+    }>()
+    edit.mockReturnValue(editRequest.promise)
+    listHistory.mockResolvedValue({
+      items: [failedHistoryRecord],
+      total: 1,
+      page: 1,
+      page_size: 50,
+    })
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const historyButton = wrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    await historyButton!.trigger('click')
+    const retryButton = wrapper.get('[data-testid="retry-failed-generation-button"]')
+    await retryButton.trigger('click')
+
+    await vi.waitFor(() => expect(edit).toHaveBeenCalledWith('sk-test', expect.any(FormData)))
+    expect(retryButton.attributes('disabled')).toBeDefined()
+    const form = edit.mock.calls[0][1] as FormData
+    expect(form.get('prompt')).toBe(retryRequest.prompt)
+    expect(form.get('model')).toBe(retryRequest.model)
+    expect(form.get('n')).toBe('2')
+    expect(form.get('size')).toBe('2160x2160')
+    expect(form.get('quality')).toBe('high')
+    expect(form.get('style')).toBe('natural')
+    expect(form.get('background')).toBe('transparent')
+    expect(form.get('output_format')).toBe('png')
+    expect(form.get('output_compression')).toBe('55')
+    expect(form.get('image')).toBeInstanceOf(Blob)
+    expect(generate).not.toHaveBeenCalled()
+
+    editRequest.resolve({
+      created: 1782100001,
+      data: [{ b64_json: 'cmV0cnktcmVzdWx0', revised_prompt: 'A retried cat' }],
+    })
+    await vi.waitFor(() => expect(saveHistory).toHaveBeenCalledWith(expect.objectContaining({
+      conversation_id: failedHistoryRecord.conversation_id,
+      prompt: retryRequest.prompt,
+      size: '1:1',
+      status: 'succeeded',
+      request: retryRequest,
+      reference_images: [imageDataURL],
+    })))
+    expect(wrapper.findAll('[data-testid="retry-failed-generation-button"]')).toHaveLength(1)
+  })
+
+  it('records a failed retry as a new failed turn', async () => {
+    edit.mockRejectedValueOnce(new Error('Upstream still unavailable'))
+    listHistory.mockResolvedValue({
+      items: [failedHistoryRecord],
+      total: 1,
+      page: 1,
+      page_size: 50,
+    })
+    saveHistory.mockImplementation((payload) => Promise.resolve({
+      ...historyRecord,
+      id: 14,
+      conversation_id: payload.conversation_id ?? 14,
+      prompt: payload.prompt,
+      request: payload.request,
+      reference_images: payload.reference_images,
+      images: payload.images,
+      status: payload.status,
+      error_message: payload.error_message ?? null,
+      created_at: '2026-06-22T10:03:00Z',
+      updated_at: '2026-06-22T10:03:00Z',
+    }))
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const historyButton = wrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    await historyButton!.trigger('click')
+    await wrapper.get('[data-testid="retry-failed-generation-button"]').trigger('click')
+
+    await vi.waitFor(() => expect(saveHistory).toHaveBeenCalledWith(expect.objectContaining({
+      conversation_id: failedHistoryRecord.conversation_id,
+      prompt: retryRequest.prompt,
+      status: 'failed',
+      error_message: 'Upstream still unavailable',
+    })))
+    await vi.waitFor(() => expect(wrapper.findAll('[data-testid="retry-failed-generation-button"]')).toHaveLength(2))
+  })
+
+  it('does not submit an incomplete failed request', async () => {
+    listHistory.mockResolvedValue({
+      items: [{ ...failedHistoryRecord, request: {} }],
+      total: 1,
+      page: 1,
+      page_size: 50,
+    })
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const historyButton = wrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    await historyButton!.trigger('click')
+    await wrapper.get('[data-testid="retry-failed-generation-button"]').trigger('click')
+
+    expect(generate).not.toHaveBeenCalled()
+    expect(edit).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('imageGeneration.retryUnavailable')
   })
 })

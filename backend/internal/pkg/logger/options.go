@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	// DefaultLogPath 为默认日志文件路径（相对于工作目录）。
-	DefaultLogPath   = "./logs/sub2api.log"
-	defaultLogFilename = "sub2api.log"
+	// DefaultContainerLogPath 为容器内默认日志文件路径。
+	DefaultContainerLogPath = "/app/data/logs/sub2api.log"
+	defaultLogFilename      = "sub2api.log"
 )
 
 type InitOptions struct {
@@ -100,7 +100,7 @@ func resolveLogFilePath(explicit string) string {
 	if dataDir != "" {
 		return filepath.Join(dataDir, "logs", defaultLogFilename)
 	}
-	return DefaultLogPath
+	return DefaultContainerLogPath
 }
 
 func bootstrapOptions() InitOptions {

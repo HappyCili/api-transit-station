@@ -1,7 +1,5 @@
 FROM golang:1.26.5-alpine
 
-ENV GOPROXY=https://goproxy.cn,direct
-
 WORKDIR /app
 
 # 安装必要的工具

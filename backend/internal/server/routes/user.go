@@ -13,11 +13,14 @@ func RegisterUserRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
 	jwtAuth middleware.JWTAuthMiddleware,
+	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
 ) {
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
+	// 用户管理面变更类操作入审计（含 TOTP 启用/禁用、step-up 验证、密码修改等安全事件）
+	authenticated.Use(gin.HandlerFunc(auditLog))
 	{
 		// 用户接口
 		user := authenticated.Group("/user")
@@ -33,17 +36,6 @@ func RegisterUserRoutes(
 			user.POST("/auth-identities/bind/start", h.User.StartIdentityBinding)
 			user.GET("/api-keys/:id/usage/daily", h.Usage.GetMyAPIKeyDailyUsage)
 			user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
-
-			imageGenerations := user.Group("/image-generations")
-			{
-				imageGenerations.GET("", h.ImageGeneration.List)
-				imageGenerations.POST("", h.ImageGeneration.Create)
-				imageGenerations.DELETE("", h.ImageGeneration.DeleteConversation)
-				imageGenerations.GET("/:id/images/:index/view", h.ImageGeneration.ViewImage)
-				imageGenerations.GET("/:id/images/:index/download", h.ImageGeneration.DownloadImage)
-				imageGenerations.PATCH("/:id/favorite", h.ImageGeneration.SetFavorite)
-				imageGenerations.DELETE("/:id", h.ImageGeneration.Delete)
-			}
 
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")
@@ -63,6 +55,8 @@ func RegisterUserRoutes(
 				totp.POST("/setup", h.Totp.InitiateSetup)
 				totp.POST("/enable", h.Totp.Enable)
 				totp.POST("/disable", h.Totp.Disable)
+				// 敏感操作二次验证：授予当前会话一段时间的 step-up 权限
+				totp.POST("/step-up", h.Totp.StepUp)
 			}
 		}
 

@@ -163,6 +163,16 @@
                             <div class="min-w-0">
                               <h2 class="text-sm font-semibold text-red-900 dark:text-red-100">{{ t('imageGeneration.failedTitle') }}</h2>
                               <p class="mt-1 break-words text-sm leading-6 text-red-700 dark:text-red-200">{{ turn.error_message || t('imageGeneration.generateFailed') }}</p>
+                              <button
+                                type="button"
+                                data-testid="retry-failed-generation-button"
+                                class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-dark-800 dark:text-red-300 dark:hover:bg-red-950/40"
+                                :disabled="generating"
+                                @click="retryFailedTurn(turn)"
+                              >
+                                <Icon name="refresh" size="sm" :class="generating ? 'animate-spin' : ''" />
+                                {{ t('imageGeneration.retry') }}
+                              </button>
                             </div>
                           </div>
 
@@ -205,9 +215,9 @@
                         <div class="mb-1 text-xs font-medium text-primary-100">{{ t('imageGeneration.userLabel') }}</div>
                         <p class="whitespace-pre-wrap break-words text-sm leading-6">{{ submittedPrompt }}</p>
                         <div class="mt-2 flex flex-wrap gap-2 text-xs text-primary-100">
-                          <span>{{ model }}</span>
-                          <span>{{ size }}</span>
-                          <span>{{ quality }}</span>
+                          <span>{{ submittedModel }}</span>
+                          <span>{{ submittedSize }}</span>
+                          <span>{{ submittedQuality }}</span>
                         </div>
                       </div>
                     </div>
@@ -243,9 +253,9 @@
                       <div class="mb-1 text-xs font-medium text-primary-100">{{ t('imageGeneration.userLabel') }}</div>
                       <p class="whitespace-pre-wrap break-words text-sm leading-6">{{ submittedPrompt }}</p>
                       <div class="mt-2 flex flex-wrap gap-2 text-xs text-primary-100">
-                        <span>{{ model }}</span>
-                        <span>{{ size }}</span>
-                        <span>{{ quality }}</span>
+                        <span>{{ submittedModel }}</span>
+                        <span>{{ submittedSize }}</span>
+                        <span>{{ submittedQuality }}</span>
                       </div>
                     </div>
                   </div>
@@ -538,6 +548,12 @@ interface ReferenceImageEntry {
   sourceKey: string
 }
 
+interface ImageGenerationSubmission {
+  payload: ImageGenerationPayload
+  referenceImages: ReferenceImageEntry[]
+  displaySize: string
+}
+
 const promptSamples = computed(() => [
   t('imageGeneration.samples.cat'),
   t('imageGeneration.samples.city'),
@@ -552,6 +568,9 @@ const conversationPendingDelete = ref<ImageGenerationConversationItem | null>(nu
 const conversationDeletePending = ref(false)
 const prompt = ref('')
 const submittedPrompt = ref('')
+const submittedModel = ref('')
+const submittedSize = ref('')
+const submittedQuality = ref<ImageQuality | ''>('')
 const currentResultPrompt = ref('')
 const model = ref('gpt-image-2')
 const style = ref<ImageStyle>('vivid')
@@ -580,13 +599,7 @@ const managedImagePreviewUrls = new Set<string>()
 let imagePreviewRefreshVersion = 0
 let conversationSelectionVersion = 0
 
-const imageGenerationKeyOptions = computed(() =>
-  apiKeys.value.filter((key) =>
-    key.status === 'active' &&
-    key.group?.platform === 'openai' &&
-    key.group?.allow_image_generation,
-  ),
-)
+const imageGenerationKeyOptions = computed(() => apiKeys.value)
 const selectedApiKey = computed(() =>
   imageGenerationKeyOptions.value.find((key) => String(key.id) === selectedApiKeyId.value) || null,
 )
@@ -714,7 +727,7 @@ watch(imageGenerationKeyOptions, (keys) => {
 
 async function loadApiKeys() {
   try {
-    const result = await keysAPI.list(1, 100, { status: 'active' })
+    const result = await keysAPI.list(1, 100, { status: 'active', image_generation_enabled: true })
     apiKeys.value = result.items
     if (imageGenerationKeyOptions.value.length === 0) {
       appStore.showError(t('imageGeneration.defaultApiKeyMissing'))
@@ -770,6 +783,9 @@ function resetGenerationResult(clearPrompt = false) {
     prompt.value = ''
   }
   submittedPrompt.value = ''
+  submittedModel.value = ''
+  submittedSize.value = ''
+  submittedQuality.value = ''
   currentResultPrompt.value = ''
   currentImages.value = []
   currentFailureMessage.value = ''
@@ -1096,7 +1112,7 @@ async function buildEditForm(payload: ImageGenerationPayload, activeReferenceIma
   }
   for (const [index, image] of activeReferenceImages.entries()) {
     const blob = await referenceImageToBlob(image)
-    form.append(referenceImageFieldName(index, activeReferenceImages.length), blob, referenceImageFileName(blob, index))
+    form.append(referenceImageFieldName(index, activeReferenceImages.length), blob, referenceImageFileName(blob, index, payload.output_format))
   }
   return form
 }
@@ -1105,8 +1121,8 @@ function referenceImageFieldName(index: number, total: number): string {
   return total <= 1 && index === 0 ? 'image' : 'image[]'
 }
 
-function referenceImageFileName(blob: Blob, index: number): string {
-  return `reference-${index + 1}.${fileExtensionForMimeType(blob.type || mimeTypeForOutputFormat(outputFormat.value))}`
+function referenceImageFileName(blob: Blob, index: number, fallbackFormat: ImageOutputFormat): string {
+  return `reference-${index + 1}.${fileExtensionForMimeType(blob.type || mimeTypeForOutputFormat(fallbackFormat))}`
 }
 
 async function referenceImageToBlob(image: ReferenceImageEntry): Promise<Blob> {
@@ -1116,19 +1132,24 @@ async function referenceImageToBlob(image: ReferenceImageEntry): Promise<Blob> {
   return fetchImageURLAsBlob(image.dataUrl)
 }
 
-async function generateImage() {
-  if (!canGenerate.value) return
-  const promptText = prompt.value.trim()
-  const activeReferenceImages = [...referenceImages.value]
+async function submitImageGeneration(submission: ImageGenerationSubmission) {
+  if (generating.value) return
+  const apiKey = selectedApiKeyValue.value
+  if (!apiKey) {
+    appStore.showError(t('imageGeneration.defaultApiKeyMissing'))
+    return
+  }
+
+  const { payload, referenceImages: activeReferenceImages, displaySize } = submission
   resetGenerationResult()
-  submittedPrompt.value = promptText
-  currentResultPrompt.value = promptText
+  submittedPrompt.value = payload.prompt
+  submittedModel.value = payload.model
+  submittedSize.value = displaySize
+  submittedQuality.value = payload.quality
+  currentResultPrompt.value = payload.prompt
   prompt.value = ''
   generating.value = true
-  let payload: ImageGenerationPayload | null = null
   try {
-    const apiKey = selectedApiKeyValue.value
-    payload = buildPayload(promptText, activeReferenceImages)
     const response = activeReferenceImages.length > 0
       ? await imageGenerationAPI.edit(apiKey, await buildEditForm(payload, activeReferenceImages))
       : await imageGenerationAPI.generate(apiKey, payload)
@@ -1140,7 +1161,7 @@ async function generateImage() {
         prompt: payload.prompt,
         revised_prompt: response.data?.find((item) => item.revised_prompt)?.revised_prompt || null,
         model: payload.model,
-        size: size.value,
+        size: displaySize,
         quality: payload.quality,
         output_format: payload.output_format,
         n: payload.n,
@@ -1163,7 +1184,6 @@ async function generateImage() {
     const errorMessage = timedOut
       ? t('imageGeneration.generateTimeoutUncertain')
       : extractOpenAIImageError(err, t('imageGeneration.generateFailed'))
-    const failedPayload = payload ?? buildPayload(promptText, activeReferenceImages)
     currentImages.value = []
     currentFailureMessage.value = timedOut ? '' : errorMessage
     currentWarningMessage.value = timedOut ? errorMessage : ''
@@ -1176,15 +1196,15 @@ async function generateImage() {
       const saved = await imageGenerationAPI.saveHistory({
         api_key_id: selectedApiKey.value?.id ?? null,
         conversation_id: currentConversationId.value,
-        prompt: failedPayload.prompt,
+        prompt: payload.prompt,
         revised_prompt: null,
-        model: failedPayload.model,
-        size: size.value,
-        quality: failedPayload.quality,
-        output_format: failedPayload.output_format,
-        n: failedPayload.n,
-        request: failedPayload as unknown as Record<string, unknown>,
-        reference_images: failedPayload.reference_images || [],
+        model: payload.model,
+        size: displaySize,
+        quality: payload.quality,
+        output_format: payload.output_format,
+        n: payload.n,
+        request: payload as unknown as Record<string, unknown>,
+        reference_images: payload.reference_images || [],
         images: [],
         status: 'failed',
         error_message: errorMessage,
@@ -1197,6 +1217,64 @@ async function generateImage() {
   } finally {
     generating.value = false
   }
+}
+
+async function generateImage() {
+  if (!canGenerate.value) return
+  const promptText = prompt.value.trim()
+  const activeReferenceImages = [...referenceImages.value]
+  await submitImageGeneration({
+    payload: buildPayload(promptText, activeReferenceImages),
+    referenceImages: activeReferenceImages,
+    displaySize: size.value,
+  })
+}
+
+function isSavedImageGenerationPayload(value: unknown): value is ImageGenerationPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const payload = value as Record<string, unknown>
+  return typeof payload.model === 'string' && payload.model !== '' &&
+    typeof payload.prompt === 'string' && payload.prompt !== '' &&
+    typeof payload.n === 'number' && Number.isFinite(payload.n) && payload.n > 0 &&
+    typeof payload.size === 'string' && payload.size !== '' &&
+    (payload.quality === 'low' || payload.quality === 'medium' || payload.quality === 'high') &&
+    (payload.response_format === 'url' || payload.response_format === 'b64_json') &&
+    (payload.style === 'vivid' || payload.style === 'natural') &&
+    (payload.background === 'auto' || payload.background === 'opaque' || payload.background === 'transparent') &&
+    (payload.output_format === 'webp' || payload.output_format === 'png' || payload.output_format === 'jpeg') &&
+    (payload.output_compression === undefined || (typeof payload.output_compression === 'number' && Number.isFinite(payload.output_compression))) &&
+    (payload.moderation === 'auto' || payload.moderation === 'low') &&
+    (payload.reference_images === undefined || (Array.isArray(payload.reference_images) && payload.reference_images.every((image) => typeof image === 'string')))
+}
+
+function retrySubmissionFromHistory(turn: ImageGenerationHistoryRecord): ImageGenerationSubmission | null {
+  if (!isSavedImageGenerationPayload(turn.request) || !Array.isArray(turn.reference_images) || !turn.reference_images.every((image) => typeof image === 'string')) {
+    return null
+  }
+
+  const referenceImages = turn.reference_images.map((dataUrl, index) => ({
+    dataUrl,
+    prompt: turn.prompt,
+    sourceKey: `retry:${turn.id}:${index}`,
+  }))
+  return {
+    payload: {
+      ...turn.request,
+      reference_images: referenceImages.length > 0 ? referenceImages.map((image) => image.dataUrl) : undefined,
+    },
+    referenceImages,
+    displaySize: turn.size,
+  }
+}
+
+async function retryFailedTurn(turn: ImageGenerationHistoryRecord) {
+  if (generating.value || turn.status !== 'failed' || isUncertainHistoryRecord(turn)) return
+  const submission = retrySubmissionFromHistory(turn)
+  if (!submission) {
+    appStore.showError(t('imageGeneration.retryUnavailable'))
+    return
+  }
+  await submitImageGeneration(submission)
 }
 
 function imagePreviewKey(image: OpenAIImageData, index: number, historyId: number | null = currentHistoryId.value): string {

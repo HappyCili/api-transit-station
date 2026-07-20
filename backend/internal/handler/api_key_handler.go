@@ -94,6 +94,7 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 			filters.GroupID = &gid
 		}
 	}
+	filters.ImageGenerationEnabled = c.Query("image_generation_enabled") == "true"
 
 	keys, result, err := h.apiKeyService.List(c.Request.Context(), subject.UserID, params, filters)
 	if err != nil {

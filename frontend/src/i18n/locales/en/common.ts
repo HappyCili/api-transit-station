@@ -53,7 +53,6 @@ export default {
 	    totalBalance: 'Total balance',
 	    available: 'Available',
     copiedToClipboard: 'Copied to clipboard',
-    copyToClipboard: 'Copy to clipboard',
     copied: 'Copied',
     copyFailed: 'Failed to copy',
     verifying: 'Verifying...',
@@ -151,7 +150,6 @@ export default {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
-    imageGeneration: 'Image Generation',
     batchImage: 'Batch Images',
     usage: 'Usage',
     redeem: 'Redeem',
@@ -192,6 +190,10 @@ export default {
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
     riskControl: 'Risk Control',
+    securityAudit: 'Security Audit',
+    contentModeration: 'Content Moderation',
+    promptAudit: 'Prompt Audit',
+    auditLogs: 'Audit Logs',
   },
 
   // Auth
@@ -413,6 +415,15 @@ export default {
     invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
     requestNewResetLink: 'Request New Reset Link',
     invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
+  },
+
+  // Step-up (sudo) 2FA prompt
+  stepUp: {
+    title: 'Two-Factor Verification Required',
+    hint: 'Enter the 6-digit code from your authenticator app to continue this sensitive operation.',
+    verifyFailed: 'Verification failed, please try again',
+    notEnabled: 'This operation requires two-factor authentication. Please enable TOTP in your profile first.',
+    adminApiKeyForbidden: 'Admin API keys cannot perform this operation. Use a two-factor verified admin session.'
   },
 
   // Dashboard

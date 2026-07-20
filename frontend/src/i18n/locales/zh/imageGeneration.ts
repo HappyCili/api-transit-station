@@ -46,6 +46,8 @@ export default {
     copyFailed: '复制失败',
     generateSuccess: '图片生成完成',
     generateFailed: '图片生成失败',
+    retry: '重试',
+    retryUnavailable: '该失败任务缺少完整请求记录，无法重试',
     failedTitle: '任务失败',
     resultUncertainTitle: '结果未确认',
     generateTimeoutUncertain: '请求等待时间过长，结果尚未确认。已避免把它记录为失败；请稍后刷新页面或查看使用记录确认是否已完成。',

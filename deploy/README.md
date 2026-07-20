@@ -1,12 +1,13 @@
 # Sub2API Deployment Files
 
-This directory contains files for deploying Sub2API on Linux servers.
+This directory contains files for deploying Sub2API on Linux servers and Apple-silicon Macs.
 
 ## Deployment Methods
 
 | Method | Best For | Setup Wizard |
 |--------|----------|--------------|
 | **Docker Compose** | Quick setup, all-in-one | Not needed (auto-setup) |
+| **Apple container** | Native local stack on macOS 26 | Not needed (auto-setup) |
 | **Binary Install** | Production servers, systemd | Web-based wizard |
 
 ## Files
@@ -16,7 +17,9 @@ This directory contains files for deploying Sub2API on Linux servers.
 | `docker-compose.yml` | Docker Compose configuration (named volumes) |
 | `docker-compose.local.yml` | Docker Compose configuration (local directories, easy migration) |
 | `docker-deploy.sh` | **One-click Docker deployment script (recommended)** |
-| `.env.example` | Docker environment variables template |
+| `apple-container.sh` | Native Apple `container` lifecycle script |
+| `APPLE_CONTAINER.md` | Apple `container` deployment and operations guide |
+| `.env.example` | Container environment variables template |
 | `DOCKER.md` | Docker Hub documentation |
 | `install.sh` | One-click binary installation script |
 | `install-datamanagementd.sh` | datamanagementd 一键安装脚本 |
@@ -24,6 +27,24 @@ This directory contains files for deploying Sub2API on Linux servers.
 | `sub2api-datamanagementd.service` | datamanagementd systemd service unit file |
 | `DATAMANAGEMENTD_CN.md` | datamanagementd 部署与联动说明（中文） |
 | `config.example.yaml` | Example configuration file |
+| `EDGE_SECURITY.md` | Reverse proxy, CDN/WAF, trusted proxy, and ingress hardening guide |
+
+---
+
+## Apple container Deployment
+
+Apple-silicon Macs running macOS 26 can run the complete Sub2API, PostgreSQL, and Redis stack with Apple `container` 1.1.0 or newer:
+
+```bash
+./apple-container.sh init
+./apple-container.sh up
+./apple-container.sh status
+./apple-container.sh logs app -f
+```
+
+The script uses Apple named volumes, starts dependencies in order, and performs live readiness checks. It does not provide a continuous restart supervisor; run `./apple-container.sh up` after a host reboot. Docker Compose remains the recommended production deployment path.
+
+See [APPLE_CONTAINER.md](./APPLE_CONTAINER.md) for configuration, upgrades, persistence, networking behavior, and limitations.
 
 ---
 
@@ -76,6 +97,7 @@ cd sub2api/deploy
 
 # Configure environment
 cp .env.example .env
+chmod 600 .env
 nano .env  # Set POSTGRES_PASSWORD and other required variables
 
 # Generate secure secrets (recommended)
@@ -216,6 +238,7 @@ docker compose down -v
 | `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
+| `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_CLIENT_SECRET` | No | *(builtin)* | Google OAuth client secret (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_SCOPES` | No | *(default)* | OAuth scopes (Gemini OAuth) |
@@ -313,12 +336,11 @@ Requires your own OAuth client credentials.
 
 ```bash
 GEMINI_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GEMINI_OAUTH_CLIENT_SECRET=your-client-secret
+GEMINI_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
 
 # 可选：如需使用 Gemini CLI 内置 OAuth Client（Code Assist / Google One）
 # 安全说明：本仓库不会内置该 client_secret，请在运行环境通过环境变量注入。
-# GEMINI_CLI_OAUTH_CLIENT_ID=your-built-in-client-id
-# GEMINI_CLI_OAUTH_CLIENT_SECRET=your-built-in-client-secret
+# GEMINI_CLI_OAUTH_CLIENT_SECRET=GOCSPX-your-built-in-secret
 ```
 
 **Step 3: Create Account in Admin UI**
@@ -443,13 +465,12 @@ If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client cre
 2. Add your OAuth credentials in the `[Service]` section (after the existing `Environment=` lines):
    ```ini
    Environment=GEMINI_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   Environment=GEMINI_OAUTH_CLIENT_SECRET=your-client-secret
+   Environment=GEMINI_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
    ```
 
    如需使用“内置 Gemini CLI OAuth Client”（Code Assist / Google One），还需要注入：
    ```ini
-   Environment=GEMINI_CLI_OAUTH_CLIENT_ID=your-built-in-client-id
-   Environment=GEMINI_CLI_OAUTH_CLIENT_SECRET=your-built-in-client-secret
+   Environment=GEMINI_CLI_OAUTH_CLIENT_SECRET=GOCSPX-your-built-in-secret
    ```
 
 3. Reload and restart:
