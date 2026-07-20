@@ -236,19 +236,19 @@ func (f fakeGoogleSubscriptionRepo) ActivateWindows(ctx context.Context, id int6
 func (f fakeGoogleSubscriptionRepo) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
 	return errors.New("not implemented")
 }
-func (f fakeGoogleSubscriptionRepo) ResetDailyUsage(ctx context.Context, id int64, _ *time.Time, start time.Time) error {
+func (f fakeGoogleSubscriptionRepo) ResetDailyUsage(ctx context.Context, id int64, start time.Time) error {
 	if f.resetDaily != nil {
 		return f.resetDaily(ctx, id, start)
 	}
 	return errors.New("not implemented")
 }
-func (f fakeGoogleSubscriptionRepo) ResetWeeklyUsage(ctx context.Context, id int64, _ *time.Time, start time.Time) error {
+func (f fakeGoogleSubscriptionRepo) ResetWeeklyUsage(ctx context.Context, id int64, start time.Time) error {
 	if f.resetWeekly != nil {
 		return f.resetWeekly(ctx, id, start)
 	}
 	return errors.New("not implemented")
 }
-func (f fakeGoogleSubscriptionRepo) ResetMonthlyUsage(ctx context.Context, id int64, _ *time.Time, start time.Time) error {
+func (f fakeGoogleSubscriptionRepo) ResetMonthlyUsage(ctx context.Context, id int64, start time.Time) error {
 	if f.resetMonthly != nil {
 		return f.resetMonthly(ctx, id, start)
 	}

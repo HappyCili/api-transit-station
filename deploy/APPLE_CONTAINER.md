@@ -101,7 +101,7 @@ Apple-specific image overrides are available:
 
 ```dotenv
 APPLE_CONTAINER_SUB2API_IMAGE=weishaw/sub2api:latest
-APPLE_CONTAINER_POSTGRES_IMAGE=postgres:18-alpine
+APPLE_CONTAINER_POSTGRES_IMAGE=postgres:16.8-alpine
 APPLE_CONTAINER_REDIS_IMAGE=redis:8-alpine
 ```
 
