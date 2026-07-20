@@ -38,4 +38,17 @@ describe('locale messages compile', () => {
     collectCompileErrors(messages, locale, errors)
     expect(errors).toEqual([])
   })
+
+  it('assembles the image generation translations in both locales', () => {
+    expect(zh.imageGeneration).toMatchObject({
+      title: '图片生成',
+      generate: '生成图片',
+      welcomeTitle: '你好！描述你想要的图片',
+    })
+    expect(en.imageGeneration).toMatchObject({
+      title: 'Image Generation',
+      generate: 'Generate',
+      welcomeTitle: 'Describe the image you want',
+    })
+  })
 })

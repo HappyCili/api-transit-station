@@ -19,6 +19,12 @@ describe('AppSidebar custom SVG styles', () => {
   })
 })
 
+describe('AppSidebar image generation navigation', () => {
+  it('keeps the image generation page discoverable independently of batch-image access', () => {
+    expect(componentSource).toContain("{ path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageIcon, hideInSimpleMode: true }")
+  })
+})
+
 describe('AppSidebar scroll position persistence', () => {
   it('binds a template ref to the sidebar nav element', () => {
     expect(componentSource).toContain('ref="sidebarNavRef"')

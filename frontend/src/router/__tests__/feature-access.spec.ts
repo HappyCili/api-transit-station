@@ -8,6 +8,7 @@ type NavigationGuard = (
 
 const routerHarness = vi.hoisted(() => ({
   guard: null as NavigationGuard | null,
+  routes: [] as Array<Record<string, any>>,
 }))
 
 const authStore = vi.hoisted(() => ({
@@ -32,13 +33,16 @@ const appStore = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
-  createRouter: vi.fn(() => ({
-    beforeEach: vi.fn((guard: NavigationGuard) => {
-      routerHarness.guard = guard
-    }),
-    afterEach: vi.fn(),
-    onError: vi.fn(),
-  })),
+  createRouter: vi.fn((options: { routes: Array<Record<string, any>> }) => {
+    routerHarness.routes = options.routes
+    return {
+      beforeEach: vi.fn((guard: NavigationGuard) => {
+        routerHarness.guard = guard
+      }),
+      afterEach: vi.fn(),
+      onError: vi.fn(),
+    }
+  }),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -173,5 +177,23 @@ describe('feature route guard', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith(target)
+  })
+})
+
+describe('image generation route', () => {
+  it('registers the authenticated image generation page', () => {
+    const route = routerHarness.routes.find((item) => item.path === '/image-generation')
+
+    expect(route).toMatchObject({
+      path: '/image-generation',
+      name: 'ImageGeneration',
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: false,
+        titleKey: 'imageGeneration.title',
+        descriptionKey: 'imageGeneration.description',
+      },
+    })
+    expect(route?.component).toBeTypeOf('function')
   })
 })
