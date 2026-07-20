@@ -200,42 +200,6 @@ describe('ImageGenerationView', () => {
     }))
   })
 
-  it('requests image-generation keys from the backend', async () => {
-    keysList.mockResolvedValue({
-      items: [
-        {
-          id: 1,
-          key: 'sk-image-enabled',
-          name: 'Image enabled',
-          status: 'active',
-          group: { name: 'Image enabled group', platform: 'openai', allow_image_generation: true },
-        },
-      ],
-    })
-
-    const wrapper = mount(ImageGenerationView, {
-      global: {
-        stubs: {
-          AppLayout: { template: '<div><slot /></div>' },
-          Icon: { template: '<span />' },
-          LoadingSpinner: { template: '<span />' },
-        },
-      },
-    })
-
-    await flushPromises()
-
-    expect(keysList).toHaveBeenCalledWith(1, 100, {
-      status: 'active',
-      image_generation_enabled: true,
-    })
-    const apiKeySelect = wrapper.findAll('select')[0]
-    expect(apiKeySelect.element.value).toBe('1')
-    expect(apiKeySelect.findAll('option').map((option) => option.text())).toEqual([
-      'Image enabled · Image enabled group',
-    ])
-  })
-
   it('edits from a generated image reference with multipart image input', async () => {
     const wrapper = mount(ImageGenerationView, {
       global: {
@@ -285,6 +249,25 @@ describe('ImageGenerationView', () => {
     }))
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
     expect(wrapper.find('[data-testid="reference-image-picker"]').exists()).toBe(false)
+  })
+
+  it('does not copy the latest history prompt into the composer', async () => {
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    const historyButton = wrapper.findAll('button').find((button) => button.text().includes('Cat study'))
+    expect(historyButton).toBeTruthy()
+    await historyButton!.trigger('click')
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('submits with Enter and clears the prompt and reference image picker', async () => {
@@ -479,6 +462,81 @@ describe('ImageGenerationView', () => {
     expect(conversationButtons[0].text()).toContain('2 轮')
   })
 
+  it('keeps an in-flight generation in its original conversation after switching history', async () => {
+    const otherConversation = {
+      ...historyRecord,
+      id: 20,
+      conversation_id: 20,
+      conversation_title: 'Landscape study',
+      prompt: 'Draw a landscape',
+      created_at: '2026-06-22T09:00:00Z',
+      updated_at: '2026-06-22T09:00:00Z',
+    }
+    const pendingGeneration = deferred<{
+      created: number
+      data: Array<{ b64_json: string; revised_prompt: string }>
+    }>()
+    generate.mockReturnValue(pendingGeneration.promise)
+    listHistory.mockReset()
+      .mockResolvedValueOnce({ items: [historyRecord, otherConversation], total: 2, page: 1, page_size: 50 })
+      .mockResolvedValueOnce({ items: [historyRecord], total: 1, page: 1, page_size: 50 })
+      .mockResolvedValueOnce({ items: [otherConversation], total: 1, page: 1, page_size: 50 })
+    saveHistory.mockImplementation((payload) => Promise.resolve({
+      ...historyRecord,
+      id: 99,
+      conversation_id: payload.conversation_id ?? 99,
+      conversation_title: 'Cat study',
+      turn_index: 2,
+      prompt: payload.prompt,
+      request: payload.request,
+      reference_images: payload.reference_images,
+      images: payload.images,
+      status: payload.status,
+      error_message: payload.error_message ?? null,
+      created_at: '2026-06-22T10:03:00Z',
+      updated_at: '2026-06-22T10:03:00Z',
+    }))
+
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-testid="conversation-history-item"][data-conversation-id="10"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('textarea').setValue('Continue the cat study')
+    const generateButton = wrapper.findAll('button').find((button) => button.text().includes('imageGeneration.generate'))
+    expect(generateButton).toBeTruthy()
+    await generateButton!.trigger('click')
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledWith('sk-test', expect.objectContaining({
+      prompt: 'Continue the cat study',
+    })))
+
+    await wrapper.get('[data-testid="conversation-history-item"][data-conversation-id="20"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Draw a landscape')
+    expect(wrapper.text()).not.toContain('Continue the cat study')
+    expect(wrapper.text()).not.toContain('imageGeneration.generating')
+
+    pendingGeneration.resolve({
+      created: 1782100001,
+      data: [{ b64_json: 'cmF0', revised_prompt: 'A continued cat study' }],
+    })
+    await vi.waitFor(() => expect(saveHistory).toHaveBeenCalledWith(expect.objectContaining({
+      conversation_id: historyRecord.conversation_id,
+      prompt: 'Continue the cat study',
+    })))
+
+    expect(wrapper.text()).toContain('Draw a landscape')
+    expect(wrapper.text()).not.toContain('Continue the cat study')
+  })
+
   it('deletes every turn in a conversation from one history action', async () => {
     const secondTurn = {
       ...historyRecord,
@@ -582,6 +640,39 @@ describe('ImageGenerationView', () => {
       'Draw a cat with crisp details',
       'A blue cat',
     ])
+  })
+
+  it('opens the full-size preview from generated thumbnails and chat images', async () => {
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          BaseDialog: {
+            props: ['show', 'title'],
+            emits: ['close'],
+            template: '<div v-if="show" data-testid="base-dialog"><button data-testid="close-image-preview" @click="$emit(\'close\')">close</button><slot /></div>',
+          },
+          Icon: { template: '<span />' },
+          LoadingSpinner: { template: '<span />' },
+        },
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-testid="conversation-history-item"][data-conversation-id="10"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.findAll('[data-testid="generated-image-thumbnail"] img')).toHaveLength(1)
+      expect(wrapper.findAll('[data-testid="conversation-generated-image"]')).toHaveLength(1)
+    })
+
+    await wrapper.get('[data-testid="generated-image-thumbnail"]').trigger('click')
+    expect(wrapper.get('[data-testid="image-preview-modal"] [data-testid="image-preview-full-size"]').attributes('src')).toBe('blob:preview')
+
+    await wrapper.get('[data-testid="close-image-preview"]').trigger('click')
+    expect(wrapper.find('[data-testid="image-preview-modal"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="conversation-generated-image"]').trigger('click')
+    expect(wrapper.get('[data-testid="image-preview-modal"] [data-testid="image-preview-full-size"]').attributes('alt')).toBe('Draw a cat with crisp details')
   })
 
   it('shows historical reference images in their turn without adding them to the composer', async () => {

@@ -37,6 +37,18 @@ func RegisterUserRoutes(
 			user.GET("/api-keys/:id/usage/daily", h.Usage.GetMyAPIKeyDailyUsage)
 			user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
 
+			// 图片生成历史
+			imageGenerations := user.Group("/image-generations")
+			{
+				imageGenerations.GET("", h.ImageGeneration.List)
+				imageGenerations.POST("", h.ImageGeneration.Create)
+				imageGenerations.DELETE("", h.ImageGeneration.DeleteConversation)
+				imageGenerations.PATCH("/:id/favorite", h.ImageGeneration.SetFavorite)
+				imageGenerations.DELETE("/:id", h.ImageGeneration.Delete)
+				imageGenerations.GET("/:id/images/:index/download", h.ImageGeneration.DownloadImage)
+				imageGenerations.GET("/:id/images/:index/view", h.ImageGeneration.ViewImage)
+			}
+
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")
 			{

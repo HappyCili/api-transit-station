@@ -180,6 +180,7 @@ func ProvideHandlers(
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
 	availableChannelHandler *AvailableChannelHandler,
+	imageGenerationHandler *ImageGenerationHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
 	_ *service.IdempotencyCoordinator,
@@ -202,6 +203,7 @@ func ProvideHandlers(
 		Payment:          paymentHandler,
 		PaymentWebhook:   paymentWebhookHandler,
 		AvailableChannel: availableChannelHandler,
+		ImageGeneration:  imageGenerationHandler,
 		AsyncImage:       asyncImageHandler,
 		BatchImage:       batchImageHandler,
 	}
@@ -225,6 +227,7 @@ var ProviderSet = wire.NewSet(
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
 	NewAvailableChannelHandler,
+	NewImageGenerationHandler,
 	NewAsyncImageHandler,
 	ProvideBatchImageHandler,
 

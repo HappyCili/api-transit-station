@@ -10,6 +10,8 @@ export default {
     emptyHistory: '暂无创作记录',
     generatedImages: '已生成',
     noGeneratedImages: '暂无图片',
+    imagePreview: '图片预览',
+    viewFullImage: '查看大图',
     userLabel: '你',
     assistantLabel: '图像助手',
     welcomeTitle: '你好！描述你想要的图片',

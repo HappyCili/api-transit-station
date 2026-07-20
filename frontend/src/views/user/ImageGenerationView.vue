@@ -65,7 +65,7 @@
               :data-conversation-id="item.conversationId"
               :title="t('imageGeneration.deleteConversation')"
               :aria-label="t('imageGeneration.deleteConversation')"
-              :disabled="conversationDeletePending || (generating && currentConversationId === item.conversationId)"
+              :disabled="conversationDeletePending || isConversationGenerating(item.conversationId)"
               class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-red-950/40 dark:hover:text-red-300"
               @click="requestDeleteConversation(item)"
             >
@@ -92,7 +92,7 @@
                     data-testid="generated-image-thumbnail"
                     class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border bg-white transition-colors dark:bg-dark-800"
                     :class="selectedImageIndex === entryPosition ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/60' : 'border-gray-200 hover:border-primary-300 dark:border-dark-600'"
-                    @click="selectGeneratedImage(entryPosition)"
+                    @click="openImagePreview(entry, entryPosition)"
                   >
                     <img v-if="entry.src" :src="entry.src" :alt="entry.prompt" class="h-full w-full object-cover" />
                     <div v-else class="flex h-full w-full items-center justify-center">
@@ -182,7 +182,16 @@
                               :key="entry.key"
                               class="overflow-hidden rounded-lg border border-gray-100 bg-gray-100 dark:border-dark-700 dark:bg-dark-900"
                             >
-                              <img v-if="entry.src" :src="entry.src" :alt="entry.prompt" class="max-h-[560px] w-full object-contain" />
+                              <button
+                                v-if="entry.src"
+                                type="button"
+                                data-testid="conversation-generated-image"
+                                class="block w-full cursor-zoom-in"
+                                :aria-label="t('imageGeneration.viewFullImage')"
+                                @click="openImagePreview(entry)"
+                              >
+                                <img :src="entry.src" :alt="entry.prompt" class="max-h-[560px] w-full object-contain" />
+                              </button>
                               <div v-else-if="entry.loading" class="flex min-h-64 items-center justify-center">
                                 <LoadingSpinner size="md" />
                               </div>
@@ -210,19 +219,19 @@
                       </div>
                     </template>
 
-                    <div v-if="generating && conversationHasPrompt" class="flex justify-end">
+                    <div v-if="isCurrentConversationGenerating && conversationHasPrompt" class="flex justify-end">
                       <div class="max-w-[min(42rem,88%)] rounded-lg rounded-tr-sm bg-primary-600 px-4 py-3 text-white shadow-sm">
                         <div class="mb-1 text-xs font-medium text-primary-100">{{ t('imageGeneration.userLabel') }}</div>
                         <p class="whitespace-pre-wrap break-words text-sm leading-6">{{ submittedPrompt }}</p>
                         <div class="mt-2 flex flex-wrap gap-2 text-xs text-primary-100">
-                          <span>{{ submittedModel }}</span>
-                          <span>{{ submittedSize }}</span>
-                          <span>{{ submittedQuality }}</span>
+                          <span>{{ model }}</span>
+                          <span>{{ size }}</span>
+                          <span>{{ quality }}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div v-if="generating" class="flex justify-start">
+                    <div v-if="isCurrentConversationGenerating" class="flex justify-start">
                       <div class="max-w-[min(48rem,96%)] rounded-lg rounded-tl-sm border border-gray-100 bg-white px-4 py-3 shadow-sm dark:border-dark-700 dark:bg-dark-800">
                         <div class="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageGeneration.assistantLabel') }}</div>
                         <div class="flex min-h-40 items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
@@ -232,7 +241,7 @@
                       </div>
                     </div>
 
-                    <div v-if="currentWarningMessage && !generating" class="flex justify-start">
+                    <div v-if="currentWarningMessage && !isCurrentConversationGenerating" class="flex justify-start">
                       <div class="max-w-[min(48rem,96%)] rounded-lg rounded-tl-sm border border-amber-100 bg-white px-4 py-3 shadow-sm dark:border-amber-900/50 dark:bg-dark-800">
                         <div class="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageGeneration.assistantLabel') }}</div>
                         <div class="flex gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
@@ -253,9 +262,9 @@
                       <div class="mb-1 text-xs font-medium text-primary-100">{{ t('imageGeneration.userLabel') }}</div>
                       <p class="whitespace-pre-wrap break-words text-sm leading-6">{{ submittedPrompt }}</p>
                       <div class="mt-2 flex flex-wrap gap-2 text-xs text-primary-100">
-                        <span>{{ submittedModel }}</span>
-                        <span>{{ submittedSize }}</span>
-                        <span>{{ submittedQuality }}</span>
+                        <span>{{ model }}</span>
+                        <span>{{ size }}</span>
+                        <span>{{ quality }}</span>
                       </div>
                     </div>
                   </div>
@@ -264,7 +273,7 @@
                     <div class="max-w-[min(48rem,96%)] rounded-lg rounded-tl-sm border border-gray-100 bg-white px-4 py-3 shadow-sm dark:border-dark-700 dark:bg-dark-800">
                       <div class="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageGeneration.assistantLabel') }}</div>
 
-                      <div v-if="currentWarningMessage && !generating" class="flex gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                      <div v-if="currentWarningMessage && !isCurrentConversationGenerating" class="flex gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
                         <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                           <Icon name="infoCircle" size="sm" />
                         </div>
@@ -274,7 +283,7 @@
                         </div>
                       </div>
 
-                      <div v-else-if="currentFailureMessage && !generating" class="flex gap-3 rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/20">
+                      <div v-else-if="currentFailureMessage && !isCurrentConversationGenerating" class="flex gap-3 rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/20">
                         <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300">
                           <Icon name="x" size="sm" />
                         </div>
@@ -284,14 +293,23 @@
                         </div>
                       </div>
 
-                      <div v-else-if="generating" class="flex min-h-40 items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                      <div v-else-if="isCurrentConversationGenerating" class="flex min-h-40 items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                         <LoadingSpinner size="md" />
                         <span>{{ t('imageGeneration.generating') }}</span>
                       </div>
 
                       <div v-else-if="selectedImageEntry">
                         <div class="overflow-hidden rounded-lg border border-gray-100 bg-gray-100 dark:border-dark-700 dark:bg-dark-900">
-                          <img v-if="selectedImageEntry.src" :src="selectedImageEntry.src" :alt="selectedImageEntry.prompt" class="max-h-[560px] w-full object-contain" />
+                          <button
+                            v-if="selectedImageEntry.src"
+                            type="button"
+                            data-testid="selected-generated-image"
+                            class="block w-full cursor-zoom-in"
+                            :aria-label="t('imageGeneration.viewFullImage')"
+                            @click="openImagePreview(selectedImageEntry)"
+                          >
+                            <img :src="selectedImageEntry.src" :alt="selectedImageEntry.prompt" class="max-h-[560px] w-full object-contain" />
+                          </button>
                           <div v-else-if="selectedImageEntry.loading" class="flex min-h-80 items-center justify-center">
                             <LoadingSpinner size="md" />
                           </div>
@@ -455,6 +473,23 @@
       @confirm="confirmDeleteConversation"
       @cancel="cancelDeleteConversation"
     />
+
+    <BaseDialog
+      :show="imagePreview !== null"
+      :title="t('imageGeneration.imagePreview')"
+      width="full"
+      :close-on-click-outside="true"
+      @close="closeImagePreview"
+    >
+      <div v-if="imagePreview" data-testid="image-preview-modal" class="flex min-h-[min(70vh,40rem)] items-center justify-center bg-gray-100 dark:bg-dark-900">
+        <img
+          data-testid="image-preview-full-size"
+          :src="imagePreview.src"
+          :alt="imagePreview.prompt"
+          class="max-h-[calc(90vh-9rem)] max-w-full object-contain"
+        />
+      </div>
+    </BaseDialog>
   </AppLayout>
 </template>
 
@@ -463,6 +498,7 @@ import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } 
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -554,6 +590,16 @@ interface ImageGenerationSubmission {
   displaySize: string
 }
 
+interface ImageGenerationTarget {
+  conversationID: number | null
+  selectionVersion: number
+}
+
+interface ImagePreview {
+  src: string
+  prompt: string
+}
+
 const promptSamples = computed(() => [
   t('imageGeneration.samples.cat'),
   t('imageGeneration.samples.city'),
@@ -564,13 +610,11 @@ const apiKeys = ref<ApiKey[]>([])
 const historyItems = ref<ImageGenerationHistoryRecord[]>([])
 const historyLoading = ref(false)
 const generating = ref(false)
+const activeGenerationTarget = ref<ImageGenerationTarget | null>(null)
 const conversationPendingDelete = ref<ImageGenerationConversationItem | null>(null)
 const conversationDeletePending = ref(false)
 const prompt = ref('')
 const submittedPrompt = ref('')
-const submittedModel = ref('')
-const submittedSize = ref('')
-const submittedQuality = ref<ImageQuality | ''>('')
 const currentResultPrompt = ref('')
 const model = ref('gpt-image-2')
 const style = ref<ImageStyle>('vivid')
@@ -594,12 +638,19 @@ const imagePreviewBlobs = ref<Record<string, Blob>>({})
 const imageClipboardBlobs = ref<Record<string, Blob>>({})
 const imageClipboardDataURLs = ref<Record<string, string>>({})
 const imagePreviewErrors = ref<Record<string, boolean>>({})
+const imagePreview = ref<ImagePreview | null>(null)
 const referenceFileInput = ref<HTMLInputElement | null>(null)
 const managedImagePreviewUrls = new Set<string>()
 let imagePreviewRefreshVersion = 0
-let conversationSelectionVersion = 0
+const conversationSelectionVersion = ref(0)
 
-const imageGenerationKeyOptions = computed(() => apiKeys.value)
+const imageGenerationKeyOptions = computed(() =>
+  apiKeys.value.filter((key) =>
+    key.status === 'active' &&
+    key.group?.platform === 'openai' &&
+    key.group?.allow_image_generation,
+  ),
+)
 const selectedApiKey = computed(() =>
   imageGenerationKeyOptions.value.find((key) => String(key.id) === selectedApiKeyId.value) || null,
 )
@@ -608,6 +659,10 @@ const canGenerate = computed(() => prompt.value.trim() !== '' && selectedApiKeyV
 const modelOptions = computed(() => ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'])
 const costHint = computed(() => t('imageGeneration.costHint', { count: countValue.value }))
 const conversationHasPrompt = computed(() => submittedPrompt.value.trim() !== '')
+const isCurrentConversationGenerating = computed(() => {
+  const target = activeGenerationTarget.value
+  return generating.value && target !== null && isViewingGenerationTarget(target)
+})
 const referenceImageEntries = computed(() =>
   referenceImages.value.map((entry, index) => ({
     ...entry,
@@ -727,7 +782,7 @@ watch(imageGenerationKeyOptions, (keys) => {
 
 async function loadApiKeys() {
   try {
-    const result = await keysAPI.list(1, 100, { status: 'active', image_generation_enabled: true })
+    const result = await keysAPI.list(1, 100, { status: 'active' })
     apiKeys.value = result.items
     if (imageGenerationKeyOptions.value.length === 0) {
       appStore.showError(t('imageGeneration.defaultApiKeyMissing'))
@@ -783,9 +838,6 @@ function resetGenerationResult(clearPrompt = false) {
     prompt.value = ''
   }
   submittedPrompt.value = ''
-  submittedModel.value = ''
-  submittedSize.value = ''
-  submittedQuality.value = ''
   currentResultPrompt.value = ''
   currentImages.value = []
   currentFailureMessage.value = ''
@@ -797,14 +849,14 @@ function resetGenerationResult(clearPrompt = false) {
 }
 
 function startNewConversation() {
-  conversationSelectionVersion += 1
+  conversationSelectionVersion.value += 1
   resetGenerationResult(true)
   currentConversationId.value = null
   conversationTurns.value = []
 }
 
 async function selectConversation(item: ImageGenerationConversationItem) {
-  const selectionVersion = ++conversationSelectionVersion
+  const selectionVersion = ++conversationSelectionVersion.value
   clearImagePreviewUrls()
   currentConversationId.value = item.conversationId
   conversationTurns.value = sortConversationTurns(item.turns)
@@ -816,12 +868,12 @@ async function selectConversation(item: ImageGenerationConversationItem) {
       page_size: 100,
       conversation_id: item.conversationId,
     })
-    if (selectionVersion !== conversationSelectionVersion || currentConversationId.value !== item.conversationId) return
+    if (selectionVersion !== conversationSelectionVersion.value || currentConversationId.value !== item.conversationId) return
     conversationTurns.value = sortConversationTurns(result.items)
     const latest = conversationTurns.value[conversationTurns.value.length - 1] || item.latest
     applyHistoryRecord(latest)
   } catch (err: unknown) {
-    if (selectionVersion !== conversationSelectionVersion) return
+    if (selectionVersion !== conversationSelectionVersion.value) return
     appStore.showError(extractApiErrorMessage(err, t('imageGeneration.loadHistoryFailed')))
   }
 }
@@ -858,12 +910,9 @@ async function confirmDeleteConversation() {
   }
 }
 
-function applyHistoryRecord(item: ImageGenerationHistoryRecord, syncPrompt = true) {
+function applyHistoryRecord(item: ImageGenerationHistoryRecord) {
   currentHistoryId.value = item.id
   currentConversationId.value = recordConversationId(item)
-  if (syncPrompt) {
-    prompt.value = item.prompt
-  }
   currentResultPrompt.value = item.prompt
   model.value = item.model
   size.value = normalizeAspectRatio(item.size)
@@ -879,14 +928,26 @@ function applyHistoryRecord(item: ImageGenerationHistoryRecord, syncPrompt = tru
   selectedImageIndex.value = 0
 }
 
-function appendConversationTurn(item: ImageGenerationHistoryRecord) {
+function appendConversationTurn(item: ImageGenerationHistoryRecord, displayInCurrentConversation = true) {
+  historyItems.value = [item, ...historyItems.value.filter((historyItem) => historyItem.id !== item.id)]
+  if (!displayInCurrentConversation) return
+
   currentConversationId.value = recordConversationId(item)
   conversationTurns.value = sortConversationTurns([
     ...conversationTurns.value.filter((turn) => turn.id !== item.id),
     item,
   ])
-  historyItems.value = [item, ...historyItems.value.filter((historyItem) => historyItem.id !== item.id)]
-  applyHistoryRecord(item, false)
+  applyHistoryRecord(item)
+}
+
+function isViewingGenerationTarget(target: ImageGenerationTarget): boolean {
+  if (currentConversationId.value !== target.conversationID) return false
+  return target.conversationID !== null || conversationSelectionVersion.value === target.selectionVersion
+}
+
+function isConversationGenerating(conversationID: number): boolean {
+  const target = activeGenerationTarget.value
+  return generating.value && target?.conversationID === conversationID
 }
 
 function normalizeQuality(value: string): ImageQuality {
@@ -919,8 +980,19 @@ function normalizeOutputFormat(value: string): ImageOutputFormat {
   return value === 'png' || value === 'jpeg' || value === 'webp' ? value : 'webp'
 }
 
-function selectGeneratedImage(index: number) {
-  selectedImageIndex.value = index
+function openImagePreview(entry: ImageEntry, selectedIndex?: number) {
+  if (!entry.src || entry.loading || entry.failed) return
+  if (selectedIndex !== undefined) {
+    selectedImageIndex.value = selectedIndex
+  }
+  imagePreview.value = {
+    src: entry.src,
+    prompt: entry.prompt,
+  }
+}
+
+function closeImagePreview() {
+  imagePreview.value = null
 }
 
 function turnReferenceImageEntries(turn: ImageGenerationHistoryRecord) {
@@ -1141,13 +1213,16 @@ async function submitImageGeneration(submission: ImageGenerationSubmission) {
   }
 
   const { payload, referenceImages: activeReferenceImages, displaySize } = submission
+  const target: ImageGenerationTarget = {
+    conversationID: currentConversationId.value,
+    selectionVersion: conversationSelectionVersion.value,
+  }
+  const apiKeyID = selectedApiKey.value?.id ?? null
   resetGenerationResult()
   submittedPrompt.value = payload.prompt
-  submittedModel.value = payload.model
-  submittedSize.value = displaySize
-  submittedQuality.value = payload.quality
   currentResultPrompt.value = payload.prompt
   prompt.value = ''
+  activeGenerationTarget.value = target
   generating.value = true
   try {
     const response = activeReferenceImages.length > 0
@@ -1156,8 +1231,8 @@ async function submitImageGeneration(submission: ImageGenerationSubmission) {
     const historyImages = compactImageHistoryData(response.data || [])
     try {
       const saved = await imageGenerationAPI.saveHistory({
-        api_key_id: selectedApiKey.value?.id ?? null,
-        conversation_id: currentConversationId.value,
+        api_key_id: apiKeyID,
+        conversation_id: target.conversationID,
         prompt: payload.prompt,
         revised_prompt: response.data?.find((item) => item.revised_prompt)?.revised_prompt || null,
         model: payload.model,
@@ -1170,32 +1245,39 @@ async function submitImageGeneration(submission: ImageGenerationSubmission) {
         images: historyImages,
         status: 'succeeded',
       })
-      appendConversationTurn(saved)
-      clearReferenceImages()
+      const displayInCurrentConversation = isViewingGenerationTarget(target)
+      appendConversationTurn(saved, displayInCurrentConversation)
+      if (displayInCurrentConversation) {
+        clearReferenceImages()
+      }
       appStore.showSuccess(t('imageGeneration.generateSuccess'))
     } catch {
       appStore.showError(t('imageGeneration.saveHistoryFailed'))
-      currentImages.value = []
-      currentFailureMessage.value = t('imageGeneration.saveHistoryFailed')
-      selectedImageIndex.value = 0
+      if (isViewingGenerationTarget(target)) {
+        currentImages.value = []
+        currentFailureMessage.value = t('imageGeneration.saveHistoryFailed')
+        selectedImageIndex.value = 0
+      }
     }
   } catch (err: unknown) {
     const timedOut = isOpenAIImageRequestTimeout(err)
     const errorMessage = timedOut
       ? t('imageGeneration.generateTimeoutUncertain')
       : extractOpenAIImageError(err, t('imageGeneration.generateFailed'))
-    currentImages.value = []
-    currentFailureMessage.value = timedOut ? '' : errorMessage
-    currentWarningMessage.value = timedOut ? errorMessage : ''
-    selectedImageIndex.value = 0
+    if (isViewingGenerationTarget(target)) {
+      currentImages.value = []
+      currentFailureMessage.value = timedOut ? '' : errorMessage
+      currentWarningMessage.value = timedOut ? errorMessage : ''
+      selectedImageIndex.value = 0
+    }
     appStore.showError(errorMessage)
     if (timedOut) {
       return
     }
     try {
       const saved = await imageGenerationAPI.saveHistory({
-        api_key_id: selectedApiKey.value?.id ?? null,
-        conversation_id: currentConversationId.value,
+        api_key_id: apiKeyID,
+        conversation_id: target.conversationID,
         prompt: payload.prompt,
         revised_prompt: null,
         model: payload.model,
@@ -1209,13 +1291,17 @@ async function submitImageGeneration(submission: ImageGenerationSubmission) {
         status: 'failed',
         error_message: errorMessage,
       })
-      appendConversationTurn(saved)
-      clearReferenceImages()
+      const displayInCurrentConversation = isViewingGenerationTarget(target)
+      appendConversationTurn(saved, displayInCurrentConversation)
+      if (displayInCurrentConversation) {
+        clearReferenceImages()
+      }
     } catch {
       appStore.showError(t('imageGeneration.saveFailedTaskFailed'))
     }
   } finally {
     generating.value = false
+    activeGenerationTarget.value = null
   }
 }
 

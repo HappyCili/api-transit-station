@@ -10,6 +10,8 @@ export default {
     emptyHistory: 'No creations yet',
     generatedImages: 'Generated',
     noGeneratedImages: 'No images',
+    imagePreview: 'Image preview',
+    viewFullImage: 'View full image',
     userLabel: 'You',
     assistantLabel: 'Image assistant',
     welcomeTitle: 'Describe the image you want',
